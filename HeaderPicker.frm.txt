@@ -1,0 +1,589 @@
+VERSION 5.00
+Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} HeaderPicker 
+   Caption         =   "HeaderPicker"
+   ClientHeight    =   11688
+   ClientLeft      =   -792
+   ClientTop       =   -3300
+   ClientWidth     =   7200
+   OleObjectBlob   =   "HeaderPicker.frx":0000
+End
+Attribute VB_Name = "HeaderPicker"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
+Attribute VB_Exposed = False
+Option Explicit
+
+'==================== モジュールレベル宣言（最初に置く） ====================
+' 呼び出し元が読むプロパティ
+Public selectedCols As Collection
+Public Canceled As Boolean
+
+' 内部状態
+Private headerRowNum As Long
+Private allItems As Variant   ' {表示名, 列番号} の2列配列
+Private syncingUI As Boolean  ' ★テキスト/コンボ相互同期のループ防止
+'==========================================================================
+' --- ここから追記（差し込み用の状態） ---
+Private WM_TemplatePaths As Collection  ' cboWM_Template の並びと同期するフルパス群
+Private Const WM_KEY_HEADER As String = "転記"   ' ★キー列は固定
+
+' （必要なら残す）フォームの空クリックイベント
+Private Sub UserForm_Click()
+End Sub
+
+
+' === 初期化（呼び出し時に見出し行を受け取る） ===
+Public Sub Init(ByVal headerRow As Long)
+    headerRowNum = headerRow
+    Me.Canceled = True
+
+    LoadHeaders                 ' 実行時に常に最新を読み込む
+    txtFilter.Text = ""
+
+    ' ★プリセット名の一覧を読み込む
+    LoadPresetNamesToCombo
+
+
+    ' 前回選択を復元（存在する見出しのみ）
+    Dim last As Collection, i As Long, j As Long, nm As String
+    Set last = LoadLastSelection()   ' ← 標準モジュール側の関数を利用
+
+    If Not last Is Nothing Then
+        For i = 0 To lstHeaders.ListCount - 1
+            nm = lstHeaders.List(i, 0)
+            For j = 1 To last.Count
+                If 正規化(nm) = 正規化(CStr(last(j))) Then
+                    lstHeaders.Selected(i) = True
+                    Exit For
+                End If
+            Next
+        Next
+    End If
+
+    ' ★差し込みUIの初期化（定義はフォーム末尾に1つだけ）
+    InitWordMergeUI
+
+End Sub
+
+
+
+' === 見出し列を読み込む（headerRowNum の行） ===
+Private Sub LoadHeaders()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets("表")   ' 「表」を明示
+
+    Dim lastCol As Long, i As Long, nm As String
+    Dim tmp As Collection: Set tmp = New Collection
+
+    lastCol = ws.Cells(headerRowNum, ws.Columns.Count).End(xlToLeft).Column
+    For i = 1 To lastCol
+        nm = 正規化(CStr(ws.Cells(headerRowNum, i).value))
+        If Len(nm) > 0 Then tmp.Add Array(nm, i)
+    Next
+
+    ' ★ここが抜けていた：allItems を作る
+    If tmp.Count = 0 Then
+        Erase allItems
+        lstHeaders.Clear
+        Exit Sub
+    End If
+
+    ReDim allItems(1 To tmp.Count, 1 To 2)
+    For i = 1 To tmp.Count
+        allItems(i, 1) = tmp(i)(0) ' 表示名
+        allItems(i, 2) = tmp(i)(1) ' 列番号
+    Next
+
+    ApplyFilter ""   ' ← ここでリストに反映
+End Sub
+
+
+
+' === フィルタ適用 ===
+Private Sub ApplyFilter(ByVal key As String)
+    Dim i As Long, n As Long
+    Dim buf() As Variant, outArr() As Variant
+    key = LCase$(key)
+
+    ' 見出しが未準備なら何もしない
+    If IsEmpty(allItems) Then
+        lstHeaders.Clear
+        Exit Sub
+    End If
+
+    ' まずは最大サイズでバッファ確保（行×列）
+    ReDim buf(1 To UBound(allItems), 1 To 2)
+    n = 0
+
+    For i = 1 To UBound(allItems)
+        If key = "" Or InStr(LCase$(allItems(i, 1)), key) > 0 Then
+            n = n + 1
+            buf(n, 1) = allItems(i, 1) ' 表示名
+            buf(n, 2) = allItems(i, 2) ' 列番号
+        End If
+    Next
+
+    ' ListBox 初期化
+    lstHeaders.Clear
+    lstHeaders.ColumnHeads = False
+    lstHeaders.ColumnCount = 2
+
+    ' ちょうどのサイズの配列にコピーして渡す
+    If n > 0 Then
+        ReDim outArr(1 To n, 1 To 2)
+        For i = 1 To n
+            outArr(i, 1) = buf(i, 1)
+            outArr(i, 2) = buf(i, 2)
+        Next
+        lstHeaders.List = outArr
+    End If
+End Sub
+
+
+
+
+' === コントロールイベント ===
+Private Sub txtFilter_Change()
+    ApplyFilter 正規化(txtFilter.Text)
+End Sub
+
+Private Sub cmdAll_Click()
+    Dim i As Long
+    For i = 0 To lstHeaders.ListCount - 1
+        lstHeaders.Selected(i) = True
+    Next
+End Sub
+
+Private Sub cmdNone_Click()
+    Dim i As Long
+    For i = 0 To lstHeaders.ListCount - 1
+        lstHeaders.Selected(i) = False
+    Next
+End Sub
+
+Private Sub cmdInvert_Click()
+    Dim i As Long
+    For i = 0 To lstHeaders.ListCount - 1
+        lstHeaders.Selected(i) = Not lstHeaders.Selected(i)
+    Next
+End Sub
+' 全列再表示ボタン
+Private Sub cmdShowAll_Click()
+    ThisWorkbook.Worksheets("表").Cells.EntireColumn.Hidden = False
+    MsgBox "すべての列を再表示しました", vbInformation
+End Sub
+
+
+
+' 抜粋実行（OKボタン）? フォームは閉じない
+Private Sub cmdOK_Click()
+    Dim ws As Worksheet
+    Dim i As Long, lastCol As Long
+    Dim showFlags() As Boolean
+    Dim selColsLocal As New Collection      ' ★ローカル名に変更（シャドーイング回避）
+    Dim selectedNames As New Collection
+
+    Set ws = ThisWorkbook.Worksheets("表")  ' 対象シート
+
+    ' 見出し未準備なら一応ロード
+    If IsEmpty(allItems) Then LoadHeaders
+
+    ' ListBox の選択を収集（0列目=表示名, 1列目=列番号）
+    For i = 0 To lstHeaders.ListCount - 1
+        If lstHeaders.Selected(i) Then
+            selColsLocal.Add CLng(lstHeaders.List(i, 1))   ' 列番号
+            selectedNames.Add CStr(lstHeaders.List(i, 0))  ' 表示名（保存用）
+        End If
+    Next
+
+    If selColsLocal.Count = 0 Then
+        MsgBox "抜粋する見出しが選ばれていません。", vbExclamation
+        Exit Sub
+    End If
+
+    ' 次回復元のために選択名を保存
+    SaveLastSelection selectedNames
+
+    ' 抜粋（全列表示→選択以外を非表示）
+    Application.ScreenUpdating = False
+    ws.Cells.EntireColumn.Hidden = False
+
+    lastCol = ws.Cells(headerRowNum, ws.Columns.Count).End(xlToLeft).Column
+    ReDim showFlags(1 To lastCol)
+    For i = 1 To selColsLocal.Count
+        showFlags(selColsLocal(i)) = True
+    Next
+    For i = 1 To lastCol
+        ws.Columns(i).Hidden = Not showFlags(i)
+    Next
+
+    Application.ScreenUpdating = True
+
+    ' ★ここでフォームのモジュールレベル変数へ反映
+    Set Me.selectedCols = selColsLocal
+
+    ' フォームは閉じない（そのまま次の操作ができる）
+    Me.Canceled = False
+    'MsgBox "選択した見出しのみ表示しました。", vbInformation
+End Sub
+Private Sub cmdCancel_Click()
+    ' キャンセル時：SelectedCols は Nothing のまま（呼び出し側で判定）
+    Me.Canceled = True
+    Me.Hide
+End Sub
+' ×で閉じたときは「キャンセル扱い」にして Unload させない
+Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
+    If CloseMode = 0 Then            ' ユーザーが×を押した
+        Me.Canceled = True           ' 呼び出し元が判定できるように
+        Me.Hide                      ' いったん隠す（Unloadしない）
+        Cancel = True                ' Unload をキャンセル
+    End If
+End Sub
+'=== プリセット名の同期（テキスト → コンボ） ===
+Private Sub txtPresetName_Change()
+    If syncingUI Then Exit Sub
+    syncingUI = True
+    On Error Resume Next
+    Me.cboPreset.value = Me.txtPresetName.Text
+    On Error GoTo 0
+    syncingUI = False
+End Sub
+Private Sub cboPreset_Change()
+    If syncingUI Then Exit Sub
+    syncingUI = True
+    On Error Resume Next
+    Me.txtPresetName.Text = CStr(Me.cboPreset.value)
+    On Error GoTo 0
+    syncingUI = False
+End Sub
+Private Sub CommandButton1_Click()
+    ' 標準モジュールのマクロを呼び出す
+    Call 結合CSV出力
+End Sub
+Private Sub CommandButton2_Click()
+    ' 標準モジュールのマクロを呼び出す
+    Call 現バージョン保存
+End Sub
+Private Sub CommandButton3_Click()
+    ' 標準モジュールのマクロを呼び出す
+    Call 科目別事業別歳出一覧編集
+End Sub
+Private Sub CommandButton4_Click()
+    ' 標準モジュールのマクロを呼び出す
+    Call 予算額を表に転写
+End Sub
+Private Sub CommandButton5_Click()
+    ' 標準モジュールのマクロを呼び出す
+    Call A列に金額情報をコメント表示
+End Sub
+
+
+Private Sub UserForm_Initialize()
+    ' サイズ固定したいならここで指定（任意）
+    Me.Width = 600
+    Me.Height = 610
+
+    ' 位置は手動にしてから中央へ
+    Me.StartUpPosition = 0
+    Me.Left = Application.Left + (Application.Width - Me.Width) / 2
+    Me.Top = Application.Top + (Application.Height - Me.Height) / 2
+End Sub
+
+
+' === 見出しの正規化：改行/全角空白/全角カッコ/連続空白を吸収 ===
+Private Function 正規化(ByVal s As String) As String
+    s = Replace$(s, vbCr, "")
+    s = Replace$(s, vbLf, "")
+    s = Trim$(s)
+    s = Replace$(s, "　", " ")
+    s = Replace$(s, "（", "(")
+    s = Replace$(s, "）", ")")
+    Do While InStr(s, "  ") > 0
+        s = Replace$(s, "  ", " ")
+    Loop
+    正規化 = s
+End Function
+
+'=== 選択コレクションの安全なゲッター（キャンセル時は Nothing を返す） ===
+Public Property Get SelectedColsSafe() As Collection
+    If selectedCols Is Nothing Then
+        Set SelectedColsSafe = Nothing
+    Else
+        Set SelectedColsSafe = selectedCols
+    End If
+End Property
+' === プリセット名一覧をコンボに読み込む（選択保持） ===
+Private Sub LoadPresetNamesToCombo()
+    Dim prev As String, lst As Collection, i As Long, found As Boolean
+    On Error Resume Next
+    prev = CStr(IIf(Me.cboPreset.ListIndex >= 0, Me.cboPreset.List(Me.cboPreset.ListIndex), Me.cboPreset.value))
+    On Error GoTo 0
+
+    Me.cboPreset.Clear
+
+    Set lst = Preset_ListNames()          ' ← Module1 の関数
+    If Not lst Is Nothing Then
+        For i = 1 To lst.Count
+            Me.cboPreset.AddItem lst(i)
+            If prev <> "" And lst(i) = prev Then found = True
+        Next
+    End If
+
+    If found Then
+        Me.cboPreset.value = prev
+    ElseIf Me.cboPreset.ListCount > 0 Then
+        Me.cboPreset.ListIndex = 0
+    End If
+End Sub
+
+
+' === プリセット保存（同名は上書き） ===        ←ここから貼り替え
+Private Sub btnPresetSave_Click()
+    Dim i As Long
+    Dim selNames As New Collection
+    Dim nm As String
+
+    ' 現在の選択見出しを収集
+    For i = 0 To lstHeaders.ListCount - 1
+        If lstHeaders.Selected(i) Then selNames.Add CStr(lstHeaders.List(i, 0))
+    Next
+    If selNames.Count = 0 Then
+        MsgBox "保存する見出しが選ばれていません。", vbExclamation
+        Exit Sub
+    End If
+
+    ' テキスト → コンボ → InputBox の順で名前を取得
+    nm = Trim$(Me.txtPresetName.Text)
+    If nm = "" Then nm = Trim$(CStr(Me.cboPreset.value))
+    If nm = "" Then nm = Trim$(InputBox("プリセット名を入力してください", "プリセット保存"))
+    If nm = "" Then
+        MsgBox "プリセット名が未入力です。", vbExclamation
+        Exit Sub
+    End If
+
+    ' 保存（同名は上書き）
+    Preset_Save nm, selNames
+
+ ' ★保存直後にコンボの一覧をリロード
+    LoadPresetNamesToCombo
+
+    ' UI を同期
+    Me.cboPreset.value = nm
+    Me.txtPresetName.Text = nm
+
+    MsgBox "プリセット「" & nm & "」を保存しました。", vbInformation
+End Sub
+
+' === プリセット呼び出し（選択状態を復元） ===    ' ←ここから置換
+Private Sub btnPresetLoad_Click()
+    Dim nm As String
+    Dim lst As Collection, i As Long, j As Long, target As String
+
+    ' 1) コンボの「選択中の項目」を最優先で取得
+    If Me.cboPreset.ListIndex >= 0 Then
+        nm = CStr(Me.cboPreset.List(Me.cboPreset.ListIndex))
+    Else
+        nm = Trim$(Me.txtPresetName.Text)   ' 未選択ならテキストから
+    End If
+    If nm = "" Then
+        MsgBox "呼び出すプリセット名を選択（または入力）してください。", vbExclamation
+        Exit Sub
+    End If
+
+    ' 2) 読み込み
+    Set lst = Preset_Load(nm)
+    If lst Is Nothing Or lst.Count = 0 Then
+        MsgBox "プリセット「" & nm & "」が見つからないか、内容が空です。", vbExclamation
+        Exit Sub
+    End If
+
+    ' 3) 一旦全解除 → 一致する見出しを選択
+    For i = 0 To lstHeaders.ListCount - 1
+        lstHeaders.Selected(i) = False
+    Next
+    For j = 1 To lst.Count
+        target = 正規化(CStr(lst(j)))
+        For i = 0 To lstHeaders.ListCount - 1
+            If 正規化(CStr(lstHeaders.List(i, 0))) = target Then
+                lstHeaders.Selected(i) = True
+                Exit For
+            End If
+        Next
+    Next
+
+    ' 4) UI 同期（両方に同じ名前を反映）
+    Me.cboPreset.value = nm
+    Me.txtPresetName.Text = nm
+
+    MsgBox "プリセット「" & nm & "」を呼び出しました。", vbInformation
+End Sub
+
+
+' === プリセット削除 ===
+Private Sub btnPresetDelete_Click()
+    Dim nm As String
+    nm = Trim$(CStr(cboPreset.value))
+    If nm = "" Then
+        MsgBox "削除するプリセット名を選択してください。", vbExclamation
+        Exit Sub
+    End If
+
+    If MsgBox("プリセット「" & nm & "」を削除します。よろしいですか？", vbExclamation + vbOKCancel) = vbOK Then
+        If Preset_Delete(nm) Then
+            LoadPresetNamesToCombo
+            cboPreset.value = ""
+            On Error Resume Next
+            If Not txtPresetName Is Nothing Then txtPresetName.Text = ""
+            On Error GoTo 0
+            MsgBox "削除しました。", vbInformation
+        Else
+            MsgBox "削除に失敗しました。", vbExclamation
+        End If
+    End If
+End Sub
+'========================================
+' 差し込みUI 初期化（フォルダ表示＋テンプレ一覧読込＋ヘッダ読み込み）
+'========================================
+Private Sub InitWordMergeUI()
+    On Error Resume Next
+    Me.lblWM_Folder.Caption = modWordMerge.WM_TemplateDir()
+    On Error GoTo 0
+
+    WM_LoadTemplatesToCombo
+
+    ' 既定キー値（A2）を「表」から取得
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets("表")
+    On Error Resume Next
+    Me.txtWM_KeyValue.Text = CStr(ws.Range("A2").value)
+    On Error GoTo 0
+End Sub
+
+
+'========================================
+' テンプレ一覧をコンボに読み込む（再読込もこれを呼ぶ）
+'========================================
+Private Sub WM_LoadTemplatesToCombo()
+    Dim col As Collection, i As Long, p As String
+    Dim keep As String, found As Boolean
+
+    ' 直前の選択を保持（再読込後に復元）
+    On Error Resume Next
+    keep = Me.cboWM_Template.value
+    On Error GoTo 0
+
+    Set WM_TemplatePaths = New Collection
+    Me.cboWM_Template.Clear
+
+    ' （任意）フォルダ表示のラベルがある場合は更新
+    On Error Resume Next
+    Me.lblWM_Folder.Caption = modWordMerge.WM_TemplateDir()
+    On Error GoTo 0
+
+    ' 一覧を取得して流し込む
+    Set col = modWordMerge.WM_ListTemplates()
+    If Not col Is Nothing And col.Count > 0 Then
+        For i = 1 To col.Count
+            p = CStr(col(i))                              ' フルパス
+            WM_TemplatePaths.Add p
+            Me.cboWM_Template.AddItem modWordMerge.WM_GetBaseName(p)  ' 表示はファイル名
+        Next
+
+        ' 直前の選択をできるだけ復元
+        If keep <> "" Then
+            For i = 0 To Me.cboWM_Template.ListCount - 1
+                If StrComp(Me.cboWM_Template.List(i), keep, vbTextCompare) = 0 Then
+                    Me.cboWM_Template.ListIndex = i
+                    found = True
+                    Exit For
+                End If
+            Next
+        End If
+        If Not found Then Me.cboWM_Template.ListIndex = 0
+    Else
+        Me.cboWM_Template.AddItem "（docx/docm がありません）"
+        Me.cboWM_Template.ListIndex = 0
+    End If
+End Sub
+
+
+    
+
+
+Private Sub btnWM_Refresh_Click()
+    WM_LoadTemplatesToCombo
+End Sub
+
+' プルダウンを開くたびに最新化したい場合（任意）
+Private Sub cboWM_Template_DropButtonClick()
+    WM_LoadTemplatesToCombo
+End Sub
+
+'========================================
+' 選択されたテンプレのフルパスを取得（なければ空）
+'========================================
+Public Property Get WM_SelectedTemplatePath() As String
+    Dim idx As Long
+    If WM_TemplatePaths Is Nothing Then Exit Property
+    If Me.cboWM_Template.ListIndex < 0 Then Exit Property
+    idx = Me.cboWM_Template.ListIndex + 1
+    If idx >= 1 And idx <= WM_TemplatePaths.Count Then
+        WM_SelectedTemplatePath = CStr(WM_TemplatePaths(idx))
+    End If
+End Property
+
+
+'========================================
+' 差し込み実行：キー列×キー値で行特定→テンプレへ差し込み→デスクトップ保存
+'========================================
+'--- 実行ボタン ---
+Private Sub btnWM_Run_Click()
+    On Error GoTo EH
+    Dim tplPath As String, keyValue As String, outPath As String
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets("表")
+
+    tplPath = Me.WM_SelectedTemplatePath
+    keyValue = Trim$(CStr(Me.txtWM_KeyValue.Text))
+
+    If Len(tplPath) = 0 Then
+        MsgBox "テンプレートが選択されていません。", vbExclamation: Exit Sub
+    End If
+    If Len(keyValue) = 0 Then
+        MsgBox "キー値を入力してください。", vbExclamation: Exit Sub
+    End If
+
+    ' 見出し行の「転記」の存在チェック
+    If GetColByHeaderLocal(ws, WM_KEY_HEADER) = 0 Then
+        MsgBox "見出し行(3行目)に『" & WM_KEY_HEADER & "』が見つかりません。", vbExclamation: Exit Sub
+    End If
+
+    ' 「表」シートを渡す
+    outPath = modWordMerge.WM_MergeToWordUsingBookmarks(tplPath, WM_KEY_HEADER, keyValue, ws)
+    MsgBox "出力完了：" & vbCrLf & outPath, vbInformation
+    Exit Sub
+EH:
+    MsgBox "エラー： " & Err.Description, vbCritical
+End Sub
+
+' === 見出し名→列番号（フォーム内ローカルの軽量版） ===
+Private Function GetColByHeaderLocal(ByVal ws As Worksheet, ByVal headerName As String) As Long
+    Const HEADER_ROW As Long = 3          ' ← ここでローカル定数にする
+    Dim lastCol As Long, c As Long, tgt As String, cur As String
+
+    tgt = LCase$(Replace(Trim$(headerName), " ", ""))
+    lastCol = ws.Cells(HEADER_ROW, ws.Columns.Count).End(xlToLeft).Column
+    For c = 1 To lastCol
+        cur = LCase$(Replace(Trim$(CStr(ws.Cells(HEADER_ROW, c).value)), " ", ""))
+        If cur = tgt Then
+            GetColByHeaderLocal = c
+            Exit Function
+        End If
+    Next
+    GetColByHeaderLocal = 0
+End Function
+
+
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
