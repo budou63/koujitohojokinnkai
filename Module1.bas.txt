@@ -1,0 +1,339 @@
+Option Explicit
+'==================== 定数（見出し・データ開始行） ====================
+Private Const WM_HEADER_ROW As Long = 3
+Private Const WM_DATA_START As Long = 4
+'==================== 設定（テンプレ格納フォルダ） ====================
+' 将来フォルダを変えたくなっても、ここだけ直せばOK
+Public Function WM_TemplateDir() As String
+    WM_TemplateDir = "\\filesv15\土木課\工事と補助金台帳\差込ワード文書"
+End Function
+'---------------------------------------------------------------------
+
+' --- [前3行] ---
+' 指定フォルダの Word 文書（.docx / .docm/ .dotm）を列挙して返す（フルパス）
+Public Function WM_ListTemplates() As Collection
+    Dim out As New Collection
+    Dim fso As Object, fld As Object, f As Object, dirPath As String, ext As String
+
+    dirPath = WM_TemplateDir()
+    If Right$(dirPath, 1) <> "\" Then dirPath = dirPath & "\"
+
+    On Error GoTo EH
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FolderExists(dirPath) Then
+        Set WM_ListTemplates = out
+        Exit Function
+    End If
+
+    Set fld = fso.GetFolder(dirPath)
+    For Each f In fld.files
+        ext = LCase$(fso.GetExtensionName(f.path))
+        If ext = "docx" Or ext = "docm" Or ext = "dotm" Then out.Add f.path
+    Next
+
+    Set WM_ListTemplates = out
+    Exit Function
+EH:
+    ' 失敗時は空コレクション
+    Set WM_ListTemplates = out
+End Function
+
+' --- [後3行] ---
+
+' --- [前3行] ---
+' パスから拡張子を除いたファイル名を返す（表示用）
+Public Function WM_GetBaseName(ByVal path As String) As String
+    Dim nm As String
+    nm = Mid$(path, InStrRev(path, "\") + 1)
+    If InStrRev(nm, ".") > 0 Then nm = Left$(nm, InStrRev(nm, ".") - 1)
+    WM_GetBaseName = nm
+End Function
+
+
+
+' --- 前3行 ---
+' デスクトップのパス（OneDrive連携でも安定）
+Public Function WM_GetDesktopPath() As String
+    Dim sh As Object, p As String
+    On Error Resume Next
+    Set sh = CreateObject("WScript.Shell")
+    p = sh.SpecialFolders("Desktop")
+    On Error GoTo 0
+    If Len(p) = 0 Then p = Environ$("USERPROFILE") & "\Desktop"
+    WM_GetDesktopPath = p
+End Function
+' --- 後3行 ---
+
+' --- 前3行 ---
+' 見出し3行目の非空セルを収集して返す
+Public Function WM_GetHeaders(ByVal ws As Worksheet) As Collection
+    Dim col As New Collection, lastCol As Long, c As Long, v As String
+    lastCol = ws.Cells(WM_HEADER_ROW, ws.Columns.Count).End(xlToLeft).Column
+    For c = 1 To lastCol
+        v = Trim$(CStr(ws.Cells(WM_HEADER_ROW, c).value))
+        If Len(v) > 0 Then col.Add v
+    Next
+    Set WM_GetHeaders = col
+End Function
+' --- 後3行 ---
+
+' --- 前3行 ---
+' 見出し名→列番号（空白/大小無視）
+Private Function WM_GetColByHeader(ByVal ws As Worksheet, ByVal headerName As String) As Long
+    Dim lastCol As Long, c As Long, tgt As String, cur As String
+    tgt = LCase$(Replace(Trim$(headerName), " ", ""))
+    lastCol = ws.Cells(WM_HEADER_ROW, ws.Columns.Count).End(xlToLeft).Column
+    For c = 1 To lastCol
+        cur = LCase$(Replace(Trim$(CStr(ws.Cells(WM_HEADER_ROW, c).value)), " ", ""))
+        If cur = tgt Then WM_GetColByHeader = c: Exit Function
+    Next
+    WM_GetColByHeader = 0
+End Function
+' --- 後3行 ---
+
+' --- 前3行 ---
+' keyHeader 列で keyValue を探して行番号（無ければ 0）
+Private Function WM_FindRowByKey(ByVal ws As Worksheet, ByVal keyHeader As String, ByVal keyValue As String) As Long
+    Dim keyCol As Long, lastRow As Long, r As Long
+    keyCol = WM_GetColByHeader(ws, keyHeader)
+    If keyCol = 0 Then Exit Function
+    lastRow = ws.Cells(ws.Rows.Count, keyCol).End(xlUp).row
+    For r = WM_DATA_START To lastRow
+        If CStr(ws.Cells(r, keyCol).value) = keyValue Then
+            WM_FindRowByKey = r
+            Exit Function
+        End If
+    Next
+End Function
+' --- 後3行 ---
+
+' --- 前3行 ---
+' 指定行×見出しの値（文字列）を返す（無ければ空）
+Private Function WM_GetValueByHeader(ByVal ws As Worksheet, ByVal r As Long, ByVal headerName As String) As String
+    Dim c As Long
+    c = WM_GetColByHeader(ws, headerName)
+    If c = 0 Then
+        WM_GetValueByHeader = ""
+    Else
+        WM_GetValueByHeader = CStr(ws.Cells(r, c).value)
+    End If
+End Function
+' --- 後3行 ---
+
+' --- 前3行 ---
+' 書式（簡易）：金額/日付は整形、それ以外は文字列
+Private Function WM_FormatForBookmark(ByVal headerName As String, ByVal v As Variant) As String
+    Dim h As String, s As String
+    h = Replace$(headerName, " ", "")
+    Select Case True
+        Case InStr(h, "金額") > 0 Or InStr(h, "単価") > 0 Or InStr(h, "額") > 0
+            If IsNumeric(v) Then s = Format$(CDbl(v), "#,##0") Else s = CStr(v)
+        Case InStr(h, "日") > 0 Or LCase$(h) Like "*date*"
+            On Error Resume Next
+            s = Format$(CDate(v), "yyyy年m月d日")
+            If Err.Number <> 0 Then s = CStr(v)
+            On Error GoTo 0
+        Case Else
+            s = CStr(v)
+    End Select
+    WM_FormatForBookmark = s
+End Function
+
+
+
+' 本体：テンプレの全ブックマーク名を列挙→同名見出しから値を取得→差し込み→デスクトップ保存
+Public Function WM_MergeToWordUsingBookmarks(ByVal templatePath As String, _
+                                             ByVal keyHeader As String, _
+                                             ByVal keyValue As String, _
+                                             ByVal ws As Worksheet) As String
+    Dim r As Long, wdApp As Object, wdDoc As Object
+    Dim rawVal As Variant, outVal As String
+    Dim outName As String, outPath As String, desk As String, base As String
+    On Error GoTo EH
+    
+    If Len(Dir$(templatePath, vbNormal)) = 0 Then Err.Raise 1001, , "テンプレ未検出: " & templatePath
+    If Len(keyHeader) = 0 Then Err.Raise 1002, , "キー列（見出し）が空です"
+    If Len(keyValue) = 0 Then Err.Raise 1003, , "キー値が空です"
+    
+    r = WM_FindRowByKey(ws, keyHeader, keyValue)
+    If r < WM_DATA_START Then Err.Raise 1004, , "キー値に一致する行が見つかりません: " & keyValue
+    
+    Set wdApp = CreateObject("Word.Application")
+    wdApp.Visible = False
+
+    ' ★ここで拡張子別に開き方を切替（.dotm/.dotx はテンプレから新規）
+    Dim ext As String
+    ext = LCase$(Mid$(templatePath, InStrRev(templatePath, ".") + 1))
+    If ext = "dotm" Or ext = "dotx" Then
+        Set wdDoc = wdApp.Documents.Add(Template:=templatePath)
+    Else
+        Set wdDoc = wdApp.Documents.Open(templatePath, ReadOnly:=True)
+    End If
+
+    ' ★「文書1」問題を防ぐ：最初に保存先を確定（以後は上書き保存が効く）
+    desk = WM_GetDesktopPath()
+    base = WM_GetBaseName(templatePath)
+    outName = WM_SanitizeFileName(base & "_" & keyValue) & ".docx"
+    
+    ' ★追加：フルパス長が長すぎないように再調整（MAX 240 目安）
+    Dim maxNameLen As Long
+    maxNameLen = 240 - (Len(desk) + 1) ' 「\」ぶん +1
+    If Len(outName) > maxNameLen Then
+        outName = Left$(outName, maxNameLen)
+    End If
+
+    outPath = desk & "\" & outName
+
+    ' ★保存（ここがコケやすいので個別に握る）
+    On Error GoTo SaveErr
+    wdDoc.SaveAs2 fileName:=outPath, FileFormat:=12, AddToRecentFiles:=False
+    On Error GoTo EH
+
+    ' ① ブックマーク名を配列に退避（0件ならスキップ）
+    Dim i As Long, bmCount As Long, names() As String
+    bmCount = wdDoc.Bookmarks.Count
+    If bmCount > 0 Then
+        ReDim names(1 To bmCount)
+        For i = 1 To bmCount
+            names(i) = wdDoc.Bookmarks(i).name
+        Next i
+
+        ' ② 各ブックマークへ差し込み（常に再追加まで行う：安全版）
+        Dim nm As String
+        Dim rng As Object
+        For i = 1 To UBound(names)
+            nm = names(i)
+            rawVal = WM_GetValueByHeader(ws, r, nm)
+            outVal = WM_FormatForBookmark(nm, rawVal)
+
+            If wdDoc.Bookmarks.Exists(nm) Then
+                Set rng = wdDoc.Bookmarks(nm).Range
+            Else
+                ' ブックマーク自体がない（テンプレ不一致など）：スキップ
+                GoTo NextI
+            End If
+
+            rng.Text = outVal
+
+            ' ★差し込んだ値をハイライト（空なら外す）
+            If Len(outVal) > 0 Then
+                rng.HighlightColorIndex = 7   ' wdYellow
+            Else
+                rng.HighlightColorIndex = 0   ' wdNoHighlight
+            End If
+
+            ' ★重要：差し込みで消えるため毎回再追加（壊れ対策）
+            wdDoc.Bookmarks.Add nm, rng
+
+NextI:
+        Next i
+
+    End If
+
+    ' ★相互参照/フィールド更新（互換性重視：本文のみ）
+    On Error Resume Next
+    wdDoc.content.Fields.Update                 ' ← StoryRanges(1) ではなく Content で安全に
+    On Error GoTo 0
+
+    ' ★再描画＆表示設定（Wordで確実に存在するプロパティのみ）
+    With wdApp
+        .ScreenUpdating = False
+    End With
+    On Error Resume Next
+    wdApp.Options.ShowPicturePlaceholders = False   ' 画像プレースホルダーを無効
+    wdApp.Options.PrintDrawingObjects = True        ' ※存在しない環境でもOn Errorで無視
+    On Error GoTo 0
+    'wdDoc.Repaginate  ' ←重い原因になりやすいのでまず無効
+
+    ' ★表示順序：可視化→アクティブ化→ActiveWindow 取得→ビュー変更（3回リトライ）
+    wdApp.Visible = True
+    wdDoc.Activate
+
+    On Error Resume Next
+    Dim wnd As Object, retry As Integer
+    For retry = 1 To 3
+        Set wnd = wdApp.ActiveWindow
+        If Not wnd Is Nothing Then
+            wnd.View.Type = 3                    ' 3 = wdPrintView（印刷レイアウト）
+            Exit For
+        End If
+        DoEvents
+        Application.Wait Now + TimeValue("0:00:01")
+    Next retry
+    On Error GoTo 0
+
+    wdApp.ScreenUpdating = True
+    DoEvents
+
+
+
+    ' ★ここでは閉じない＝ユーザーが編集→上書き保存できる状態で残す
+    wdApp.Visible = True
+
+    WM_MergeToWordUsingBookmarks = outPath
+    Exit Function
+    
+SaveErr:
+    MsgBox "保存に失敗しました。" & vbCrLf & _
+           "出力先: " & outPath & vbCrLf & _
+           "原因の多くは『ファイル名/パスが長すぎる』ことです。" & vbCrLf & _
+           "・テンプレ名 もしくは 転記キー値 を短くして再実行してください。", _
+           vbCritical
+    Resume EH
+    
+EH:
+    On Error Resume Next
+    If Not wdDoc Is Nothing Then wdDoc.Close SaveChanges:=False
+    If Not wdApp Is Nothing Then wdApp.Quit
+    On Error GoTo 0
+    Err.Raise Err.Number, , Err.Description
+End Function
+
+' ファイル名に使えない文字を安全に置換
+Private Function WM_SanitizeFileName(ByVal s As String) As String
+    Dim bad As Variant, i As Long
+    bad = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
+    For i = LBound(bad) To UBound(bad)
+        s = Replace$(s, bad(i), "_")
+    Next
+    ' 末尾のピリオド/スペースは不可
+    Do While Len(s) > 0 And (Right$(s, 1) = " " Or Right$(s, 1) = ".")
+        s = Left$(s, Len(s) - 1)
+    Loop
+    If Len(s) = 0 Then s = "out"
+    ' ★追加：長さを制限（Unicode でも安心運用のため 100 文字に丸め）
+    If Len(s) > 100 Then s = Left$(s, 100)
+    WM_SanitizeFileName = s
+End Function
+' テンプレのブックマーク名とExcel見出しの差を表示（診断用）
+Public Sub WM_CheckTemplateAgainstHeaders(ByVal templatePath As String, ByVal ws As Worksheet)
+    Dim wdApp As Object, wdDoc As Object, i As Long
+    Dim dict As Object: Set dict = CreateObject("Scripting.Dictionary")
+    Dim cols As Collection, miss As String, key As String
+
+    ' 見出し（3行目）を辞書へ（空白無視・小文字化）
+    Set cols = WM_GetHeaders(ws)
+    For i = 1 To cols.Count
+        key = LCase$(Replace(CStr(cols(i)), " ", ""))
+        dict(key) = True
+    Next
+
+    Set wdApp = CreateObject("Word.Application")
+    Set wdDoc = wdApp.Documents.Open(templatePath, ReadOnly:=True)
+
+    For i = 1 To wdDoc.Bookmarks.Count
+        key = LCase$(Replace(wdDoc.Bookmarks(i).name, " ", ""))
+        If Not dict.Exists(key) Then
+            miss = miss & "・" & wdDoc.Bookmarks(i).name & vbCrLf
+        End If
+    Next
+
+    wdDoc.Close SaveChanges:=False
+    wdApp.Quit
+
+    If Len(miss) > 0 Then
+        MsgBox "Excel見出しに無いブックマークがあります:" & vbCrLf & miss, vbInformation
+    Else
+        MsgBox "テンプレのブックマークはすべてExcel見出しと一致しています。", vbInformation
+    End If
+End Sub
