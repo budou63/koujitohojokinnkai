@@ -1,0 +1,168 @@
+Option Explicit
+
+'=================================================
+' 口座名義 正規化（振込用 半角カタカナ）
+'=================================================
+Public Function NormalizeAccountName(ByVal inputText As String) As String
+    Dim result As String
+    Dim originalHasSpace As Boolean
+
+    If Len(inputText) = 0 Then
+        NormalizeAccountName = ""
+        Exit Function
+    End If
+
+    ' 元の文字列にスペースがあったか（個人名判定用）
+    originalHasSpace = (InStr(inputText, " ") > 0 Or InStr(inputText, "　") > 0)
+
+    result = inputText
+
+    ' 1) 全角英数 → 半角英数
+    result = StrConv(result, vbNarrow)
+
+    ' 2) ひらがな/全角カナ → 全角カタカナ
+    result = StrConv(result, vbKatakana)
+
+    ' 3) 記号類の表記ゆれ統一（全角カナ段階で）
+    result = Replace(result, "（", "(")
+    result = Replace(result, "）", ")")
+    result = Replace(result, "〔", "[")
+    result = Replace(result, "〕", "]")
+
+    ' 4) 法人略語・営業所略語・事業体略語（全角段階で変換）
+    result = NormalizeCorpAbbr(result)
+    result = NormalizeBranchAbbr(result)
+    result = NormalizeBusinessAbbr(result)
+
+    ' 5) 全角カタカナ → 半角カタカナ（濁点等含め StrConvが一番安全）
+    result = StrConv(result, vbNarrow)
+
+    ' 6) 小さいカナ → 大きいカナ
+    result = NormalizeSmallKana(result)
+
+    ' 7) 長音「ｰ/－/ー」→ "-"
+    result = Replace(result, "ｰ", "-")
+    result = Replace(result, "－", "-")
+    result = Replace(result, "ー", "-")
+
+    ' 8) 中点「・/･」→ "."
+    result = Replace(result, "・", ".")
+    result = Replace(result, "･", ".")
+
+    ' 9) スペース正規化
+    result = NormalizeSpaces(result, originalHasSpace)
+
+    ' 10) 余計なカッコや全角記号の保険除去
+    result = Replace(result, """", "")
+    result = Application.Trim(result)
+
+    NormalizeAccountName = result
+End Function
+
+
+'---------------------------------------------
+' 小さいカナ → 大きいカナ（半角）
+'---------------------------------------------
+Private Function NormalizeSmallKana(ByVal s As String) As String
+    Dim r As String
+    r = s
+    r = Replace(r, "ｧ", "ｱ")
+    r = Replace(r, "ｨ", "ｲ")
+    r = Replace(r, "ｩ", "ｳ")
+    r = Replace(r, "ｪ", "ｴ")
+    r = Replace(r, "ｫ", "ｵ")
+    r = Replace(r, "ｬ", "ﾔ")
+    r = Replace(r, "ｭ", "ﾕ")
+    r = Replace(r, "ｮ", "ﾖ")
+    r = Replace(r, "ｯ", "ﾂ")
+    NormalizeSmallKana = r
+End Function
+
+
+'---------------------------------------------
+' スペース正規化
+' ・個人名：元々スペースがある場合のみ 1つ残す
+' ・法人等：スペースは全部削除
+'---------------------------------------------
+Private Function NormalizeSpaces(ByVal s As String, ByVal originalHasSpace As Boolean) As String
+    Dim r As String
+    r = Replace(s, "　", " ")
+    If originalHasSpace Then
+        Do While InStr(r, "  ") > 0
+            r = Replace(r, "  ", " ")
+        Loop
+    Else
+        r = Replace(r, " ", "")
+    End If
+    NormalizeSpaces = Trim(r)
+End Function
+
+
+'---------------------------------------------
+' 法人略語統一（資料のルール反映）
+' 株式会社/有限会社/合同会社/社団法人/財団法人
+'---------------------------------------------
+Private Function NormalizeCorpAbbr(ByVal s As String) As String
+    Dim r As String
+    r = s
+
+    ' 株式会社
+    r = Replace(r, "株式会社", "ｶ)")
+    r = Replace(r, "(株)", "ｶ)")
+    r = Replace(r, "（株）", "ｶ)")
+    r = Replace(r, "㈱", "ｶ)")
+
+    ' 有限会社
+    r = Replace(r, "有限会社", "ﾕ)")
+    r = Replace(r, "(有)", "ﾕ)")
+    r = Replace(r, "（有）", "ﾕ)")
+    r = Replace(r, "㈲", "ﾕ)")
+
+    ' 合同会社
+    r = Replace(r, "合同会社", "ﾄﾞ)")
+    r = Replace(r, "(同)", "ﾄﾞ)")
+    r = Replace(r, "（同）", "ﾄﾞ)")
+
+    ' 社団法人
+    r = Replace(r, "社団法人", "ｼﾔ)")
+    r = Replace(r, "(社)", "ｼﾔ)")
+    r = Replace(r, "（社）", "ｼﾔ)")
+
+    ' 財団法人
+    r = Replace(r, "財団法人", "ｻﾞｲ)")
+    r = Replace(r, "(財)", "ｻﾞｲ)")
+    r = Replace(r, "（財）", "ｻﾞｲ)")
+
+    NormalizeCorpAbbr = r
+End Function
+
+
+'---------------------------------------------
+' 営業所略語（資料のルール反映）
+'---------------------------------------------
+Private Function NormalizeBranchAbbr(ByVal s As String) As String
+    Dim r As String
+    r = s
+    r = Replace(r, "営業所", "ｴｲ)")
+    r = Replace(r, "(営業所)", "ｴｲ)")
+    r = Replace(r, "（営業所）", "ｴｲ)")
+    NormalizeBranchAbbr = r
+End Function
+
+
+'---------------------------------------------
+' 事業体略語（資料のルール反映）
+'---------------------------------------------
+Private Function NormalizeBusinessAbbr(ByVal s As String) As String
+    Dim r As String
+    r = s
+
+    r = Replace(r, "協同組合", "ｷﾖｳｸﾐ")
+    r = Replace(r, "農業協同組合", "ﾉｳｷﾖｳ")
+    r = Replace(r, "信用組合", "ｼﾝﾖｳｸﾐ")
+    r = Replace(r, "信用金庫", "ｼﾝﾖｳｷﾝｺ")
+    r = Replace(r, "労働金庫", "ﾛｳﾄﾞｳｷﾝｺ")
+
+    NormalizeBusinessAbbr = r
+End Function
+
