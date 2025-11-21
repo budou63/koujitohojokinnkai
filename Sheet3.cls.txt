@@ -16,6 +16,11 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Set colMap = CreateObject("Scripting.Dictionary")
 
     On Error GoTo ErrorHandler
+
+    ' ★行または列全体だけが対象のとき（挿入・削除など）は何もしない
+    If Target.Address = Target.EntireColumn.Address Then Exit Sub
+    If Target.Address = Target.EntireRow.Address Then Exit Sub
+
     Application.EnableEvents = False
 
     ' ▼ どの編集でもまずログ＆黄色塗り（表シートかどうかは中で判定）
@@ -25,22 +30,21 @@ Private Sub Worksheet_Change(ByVal Target As Range)
 
     ' === 見出し名と列番号を記録 ===
     For i = 1 To Me.Cells(3, Columns.Count).End(xlToLeft).Column
-        colMap(Me.Cells(3, i).value) = i
-        Select Case Me.Cells(3, i).value
+        colMap(Me.Cells(3, i).Value) = i
+        Select Case Me.Cells(3, i).Value
             Case "件名": 件名列 = i
             Case "採番": 採番列 = i
             Case "細々節〔繰越明許分〕": 細々節列 = i
         End Select
     Next i
 
-        ' === 業者名入力時：代表者・住所を自動入力（見出し名ベースでズレない） ===
+    ' === 業者名入力時：代表者・住所を自動入力（見出し名ベースでズレない） ===
     Dim headerRow As Long: headerRow = 3
     Dim col業者 As Long, col起案日 As Long, col代表者 As Long, col住所 As Long
 
-    ' ★あなたの見出しに合わせた候補（必要に応じて追加OK）
     col業者 = ColFrom(colMap, "施工業者・債権者", "業者名", "施工業者", "債権者")
     col起案日 = ColFrom(colMap, "起案日", "起案日付")
-    col代表者 = ColFrom(colMap, "代表者", "代表者名", "担当者")   ' 担当者を代表者に流用したい場合の保険
+    col代表者 = ColFrom(colMap, "代表者", "代表者名", "担当者")
     col住所 = ColFrom(colMap, "住所", "所在地")
 
     If col業者 > 0 And col起案日 > 0 And col代表者 > 0 And col住所 > 0 Then
@@ -48,29 +52,28 @@ Private Sub Worksheet_Change(ByVal Target As Range)
         Set rng業者 = Intersect(Target, Me.Range(Me.Cells(headerRow + 1, col業者), Me.Cells(Rows.Count, col業者).End(xlUp)))
         If Not rng業者 Is Nothing Then
             For Each c In rng業者.Cells
-                If Trim(c.value) <> "" Then
+                If Trim(c.Value) <> "" Then
                     Dim key As String, rep As String, addr As String
-                    key = Replace(Replace(Application.Trim(Replace(CStr(c.value), "　", " ")), vbCr, ""), vbLf, "")
+                    key = Replace(Replace(Application.Trim(Replace(CStr(c.Value), "　", " ")), vbCr, ""), vbLf, "")
 
-                    GetLatestRepAddr Me, headerRow, col業者, col起案日, col代表者, col住所, c.row, key, rep, addr
-                    If rep <> "" Then Me.Cells(c.row, col代表者).value = rep
-                    If addr <> "" Then Me.Cells(c.row, col住所).value = addr
+                    GetLatestRepAddr Me, headerRow, col業者, col起案日, col代表者, col住所, c.Row, key, rep, addr
+                    If rep <> "" Then Me.Cells(c.Row, col代表者).Value = rep
+                    If addr <> "" Then Me.Cells(c.Row, col住所).Value = addr
                 End If
             Next c
         End If
     End If
 
-
     ' === 細々節の語尾追加 ===
     If 細々節列 > 0 Then
         If Not Intersect(Target, Me.Range(Me.Cells(4, 細々節列), Me.Cells(1000, 細々節列))) Is Nothing Then
             For Each cell In Intersect(Target, Me.Range(Me.Cells(4, 細々節列), Me.Cells(1000, 細々節列)))
-                If Trim(cell.value) <> "" Then
+                If Trim(cell.Value) <> "" Then
                     Dim original As String, normalized As String
-                    original = cell.value
+                    original = cell.Value
                     normalized = Replace(Replace(Replace(Trim(original), vbCr, ""), vbLf, ""), "　", "")
                     If Right(normalized, Len(繰越語尾)) <> 繰越語尾 Then
-                        cell.value = Trim(original) & 繰越語尾
+                        cell.Value = Trim(original) & 繰越語尾
                     End If
                 End If
             Next cell
@@ -81,24 +84,24 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     If 件名列 > 0 And 採番列 > 0 Then
         If Not Intersect(Target, Me.Range(Me.Cells(4, 件名列), Me.Cells(Rows.Count, 件名列).End(xlUp))) Is Nothing Then
             Set usedNumbers = CreateObject("Scripting.Dictionary")
-            lastRow = Me.Cells(Me.Rows.Count, 件名列).End(xlUp).row
+            lastRow = Me.Cells(Me.Rows.Count, 件名列).End(xlUp).Row
             For i = 4 To lastRow
-                番号 = Me.Cells(i, 採番列).value
+                番号 = Me.Cells(i, 採番列).Value
                 If 番号 <> "" Then usedNumbers(CStr(Format(番号, "000"))) = True
             Next i
             For Each cell In Intersect(Target, Me.Range(Me.Cells(4, 件名列), Me.Cells(Rows.Count, 件名列).End(xlUp)))
-                If Trim(cell.value) <> "" And Me.Cells(cell.row, 採番列).value = "" Then
+                If Trim(cell.Value) <> "" And Me.Cells(cell.Row, 採番列).Value = "" Then
                     nextNumber = 1
                     Do While usedNumbers.Exists(Format(nextNumber, "000"))
                         nextNumber = nextNumber + 1
                     Loop
-                    Me.Cells(cell.row, 採番列).value = Format(nextNumber, "000")
+                    Me.Cells(cell.Row, 採番列).Value = Format(nextNumber, "000")
                     usedNumbers.Add Format(nextNumber, "000"), True
                 End If
             Next cell
         End If
     End If
-    
+
     ' === 工期終了日の反映 ===
     Dim 工期ペア As Variant
     工期ペア = Array( _
@@ -116,12 +119,12 @@ Private Sub Worksheet_Change(ByVal Target As Range)
             destCol = colMap(工期ペア(i)(2))
             If Not Intersect(Target, Me.Range(Me.Cells(4, condCol), Me.Cells(Rows.Count, condCol).End(xlUp))) Is Nothing Then
                 For Each cell In Intersect(Target, Me.Range(Me.Cells(4, condCol), Me.Cells(Rows.Count, condCol).End(xlUp)))
-                    row = cell.row
-                    val = Trim(cell.value)
+                    row = cell.Row
+                    val = Trim(cell.Value)
                     If val = "" Or val = "工期延期" Then
-                        Me.Cells(row, destCol).value = ""
+                        Me.Cells(row, destCol).Value = ""
                     Else
-                        Me.Cells(row, destCol).value = Me.Cells(row, srcCol).value
+                        Me.Cells(row, destCol).Value = Me.Cells(row, srcCol).Value
                     End If
                 Next cell
             End If
@@ -168,59 +171,59 @@ Private Sub Worksheet_Change(ByVal Target As Range)
             condCol = colMap(condName)
             If Not Intersect(Target, Me.Range(Me.Cells(4, condCol), Me.Cells(Rows.Count, condCol).End(xlUp))) Is Nothing Then
                 For Each cell In Intersect(Target, Me.Range(Me.Cells(4, condCol), Me.Cells(Rows.Count, condCol).End(xlUp)))
-                    row = cell.row
-                    val = Trim(cell.value)
+                    row = cell.Row
+                    val = Trim(cell.Value)
 
                     Select Case val
                         Case "増額変更", "インフレスライド"
-                            If IsNumeric(Me.Cells(row, colMap(fromName)).value) And IsNumeric(Me.Cells(row, colMap(changeName)).value) Then
-                                Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value + Me.Cells(row, colMap(changeName)).value
+                            If IsNumeric(Me.Cells(row, colMap(fromName)).Value) And IsNumeric(Me.Cells(row, colMap(changeName)).Value) Then
+                                Me.Cells(row, colMap(toName)).Value = Me.Cells(row, colMap(fromName)).Value + Me.Cells(row, colMap(changeName)).Value
                             Else
-                                Me.Cells(row, colMap(toName)).value = ""
+                                Me.Cells(row, colMap(toName)).Value = ""
                             End If
 
                         Case "減額変更"
-                            If IsNumeric(Me.Cells(row, colMap(fromName)).value) And IsNumeric(Me.Cells(row, colMap(changeName)).value) Then
-                                Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value - Me.Cells(row, colMap(changeName)).value
+                            If IsNumeric(Me.Cells(row, colMap(fromName)).Value) And IsNumeric(Me.Cells(row, colMap(changeName)).Value) Then
+                                Me.Cells(row, colMap(toName)).Value = Me.Cells(row, colMap(fromName)).Value - Me.Cells(row, colMap(changeName)).Value
                             Else
-                                Me.Cells(row, colMap(toName)).value = ""
+                                Me.Cells(row, colMap(toName)).Value = ""
                             End If
 
                         Case "工期延期"
-                            Me.Cells(row, colMap(changeName)).value = 0
-                            Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value
-                            Me.Cells(row, colMap(designTo)).value = Me.Cells(row, colMap(designFrom)).value
-                            Me.Cells(row, colMap(workTo)).value = Me.Cells(row, colMap(workFrom)).value
-                            Me.Cells(row, colMap(amt1To)).value = Me.Cells(row, colMap(amt1From)).value
-                            Me.Cells(row, colMap(amt2To)).value = Me.Cells(row, colMap(amt2From)).value
-                            Me.Cells(row, colMap(amt3To)).value = Me.Cells(row, colMap(amt3From)).value
-                            Me.Cells(row, colMap(amt4To)).value = Me.Cells(row, colMap(amt4From)).value
+                            Me.Cells(row, colMap(changeName)).Value = 0
+                            Me.Cells(row, colMap(toName)).Value = Me.Cells(row, colMap(fromName)).Value
+                            Me.Cells(row, colMap(designTo)).Value = Me.Cells(row, colMap(designFrom)).Value
+                            Me.Cells(row, colMap(workTo)).Value = Me.Cells(row, colMap(workFrom)).Value
+                            Me.Cells(row, colMap(amt1To)).Value = Me.Cells(row, colMap(amt1From)).Value
+                            Me.Cells(row, colMap(amt2To)).Value = Me.Cells(row, colMap(amt2From)).Value
+                            Me.Cells(row, colMap(amt3To)).Value = Me.Cells(row, colMap(amt3From)).Value
+                            Me.Cells(row, colMap(amt4To)).Value = Me.Cells(row, colMap(amt4From)).Value
 
                         Case "軽微変更"
-                            Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value
-                            Me.Cells(row, colMap(designTo)).value = Me.Cells(row, colMap(designFrom)).value
-                            Me.Cells(row, colMap(workTo)).value = ""
-                            Me.Cells(row, colMap(amt1To)).value = Me.Cells(row, colMap(amt1From)).value
-                            Me.Cells(row, colMap(amt2To)).value = Me.Cells(row, colMap(amt2From)).value
-                            Me.Cells(row, colMap(amt3To)).value = Me.Cells(row, colMap(amt3From)).value
-                            Me.Cells(row, colMap(amt4To)).value = Me.Cells(row, colMap(amt4From)).value
-                            Me.Cells(row, colMap(changeName)).value = ""
+                            Me.Cells(row, colMap(toName)).Value = Me.Cells(row, colMap(fromName)).Value
+                            Me.Cells(row, colMap(designTo)).Value = Me.Cells(row, colMap(designFrom)).Value
+                            Me.Cells(row, colMap(workTo)).Value = ""
+                            Me.Cells(row, colMap(amt1To)).Value = Me.Cells(row, colMap(amt1From)).Value
+                            Me.Cells(row, colMap(amt2To)).Value = Me.Cells(row, colMap(amt2From)).Value
+                            Me.Cells(row, colMap(amt3To)).Value = Me.Cells(row, colMap(amt3From)).Value
+                            Me.Cells(row, colMap(amt4To)).Value = Me.Cells(row, colMap(amt4From)).Value
+                            Me.Cells(row, colMap(changeName)).Value = ""
 
                         Case "丸々繰越", "前金払後繰越"
                             Dim clearCols As Variant: clearCols = Array(changeName, toName, designTo, amt1To, amt2To, amt3To, amt4To)
                             Dim cname As Variant
                             For Each cname In clearCols
                                 If colMap.Exists(cname) Then
-                                    Me.Cells(row, colMap(cname)).value = 0
+                                    Me.Cells(row, colMap(cname)).Value = 0
                                 End If
                             Next cname
                             If colMap.Exists(workFrom) And colMap.Exists(workTo) Then
-                                Me.Cells(row, colMap(workTo)).value = Me.Cells(row, colMap(workFrom)).value
+                                Me.Cells(row, colMap(workTo)).Value = Me.Cells(row, colMap(workFrom)).Value
                             End If
                             Dim fld As Variant
                             For Each fld In Array("始", "終", "設計金額", "債務負担額", "補助対象額", "国費率", "補助額", "単市", "工事内容")
                                 If colMap.Exists(fld & suffixFrom) And colMap.Exists(fld & "a") Then
-                                    Me.Cells(row, colMap(fld & "a")).value = Me.Cells(row, colMap(fld & suffixFrom)).value
+                                    Me.Cells(row, colMap(fld & "a")).Value = Me.Cells(row, colMap(fld & suffixFrom)).Value
                                 End If
                             Next fld
 
@@ -230,22 +233,21 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                             Dim cname2 As Variant
                             For Each cname2 In clearList
                                 If colMap.Exists(cname2) Then
-                                    Me.Cells(row, colMap(cname2)).value = ""
+                                    Me.Cells(row, colMap(cname2)).Value = ""
                                 End If
                             Next cname2
                     End Select
 
-
-' 単市 = 債務負担額 - 補助対象額
-If val = "増額変更" Or val = "減額変更" Or val = "工期延期" Or val = "軽微変更" Or val = "インフレスライド" Then
-    If colMap.Exists(toName) And colMap.Exists(amt1To) And colMap.Exists(amt4To) Then
-        If IsNumeric(Me.Cells(row, colMap(toName)).value) And IsNumeric(Me.Cells(row, colMap(amt1To)).value) Then
-            Me.Cells(row, colMap(amt4To)).value = Me.Cells(row, colMap(toName)).value - Me.Cells(row, colMap(amt1To)).value
-        Else
-            Me.Cells(row, colMap(amt4To)).value = ""
-        End If
-    End If
-End If
+                    ' 単市 = 債務負担額 - 補助対象額
+                    If val = "増額変更" Or val = "減額変更" Or val = "工期延期" Or val = "軽微変更" Or val = "インフレスライド" Then
+                        If colMap.Exists(toName) And colMap.Exists(amt1To) And colMap.Exists(amt4To) Then
+                            If IsNumeric(Me.Cells(row, colMap(toName)).Value) And IsNumeric(Me.Cells(row, colMap(amt1To)).Value) Then
+                                Me.Cells(row, colMap(amt4To)).Value = Me.Cells(row, colMap(toName)).Value - Me.Cells(row, colMap(amt1To)).Value
+                            Else
+                                Me.Cells(row, colMap(amt4To)).Value = ""
+                            End If
+                        End If
+                    End If
 
                 Next cell
             End If
@@ -260,17 +262,15 @@ End If
 
         If Not Intersect(Target, Me.Columns(債務列)) Is Nothing Or Not Intersect(Target, Me.Columns(補助列)) Is Nothing Then
             For Each cell In Target
-                row = cell.row
+                row = cell.Row
                 If row >= 4 Then
                     Dim valW As Variant, valX As Variant, コメント内容 As String
-                    valW = Me.Cells(row, 債務列).value
-                    valX = Me.Cells(row, 補助列).value
+                    valW = Me.Cells(row, 債務列).Value
+                    valX = Me.Cells(row, 補助列).Value
 
                     With Me.Cells(row, 1) ' A列
-                        ' 既存コメント削除
                         If Not .Comment Is Nothing Then .Comment.Delete
 
-                        ' 両方に値があればコメント追加
                         If valW <> "" And valX <> "" Then
                             コメント内容 = "最終債務：" & Format(valW, "#,##0") & "円" & vbCrLf & _
                                            "補助対象：" & Format(valX, "#,##0") & "円"
@@ -285,7 +285,6 @@ End If
 CleanExit:
     Application.EnableEvents = True
     Exit Sub
-
 
 ErrorHandler:
     MsgBox "エラーが発生しました：" & Err.Description, vbExclamation
