@@ -1,0 +1,76 @@
+Option Explicit
+
+' 構造リストを outDir\manifest\workbook_manifest.txt に出力
+Public Sub ExportWorkbookManifest_Custom(ByVal outDir As String)
+    Dim outPath As String
+    outPath = EnsureTrailSlash(outDir) & "manifest\workbook_manifest.txt"
+    MkDirIfMissing EnsureTrailSlash(outDir) & "manifest\"
+
+    Dim sb As String
+    sb = "カテゴリ" & vbTab & "ファイル名" & vbTab & "パス" & vbTab & "更新日時" & vbCrLf
+
+    ' --- ここがポイント：outDir（引数）を渡す ---
+    sb = sb & CollectFiles(outDir, "src\modules\", "*.txt", "VBA Module")
+    sb = sb & CollectFiles(outDir, "sheets\", "*.txt", "Sheet Data")
+    sb = sb & CollectFiles(outDir, "names\", "*.txt", "Defined Name")
+    sb = sb & CollectFiles(outDir, "csv\", "*.csv", "CSV Export")
+    sb = sb & CollectFiles(outDir, "bin\", "*.xls*", "Workbook Copy")           ' xlsm/xlsx 両対応
+
+    SaveTextLocal outPath, sb
+End Sub
+
+' baseDir\subDir\pattern を列挙
+Private Function CollectFiles(ByVal baseDir As String, _
+                              ByVal subDir As String, _
+                              ByVal pattern As String, _
+                              ByVal category As String) As String
+    Dim path As String, f As String, lines As String, p As String
+
+    path = EnsureTrailSlash(baseDir) & subDir
+    path = EnsureTrailSlash(path)
+
+    f = Dir$(path & pattern)
+    Do While Len(f) > 0
+        p = path & f
+        ' FileDateTime 安全化（稀な競合・パス問題で落ちないように）
+        On Error Resume Next
+        Dim ts As String
+        ts = ""
+        ts = Format$(FileDateTime(p), "yyyy-mm-dd hh:nn:ss")
+        If Err.Number <> 0 Then
+            Err.Clear
+            ts = ""   ' 取れない場合は空で続行
+        End If
+        On Error GoTo 0
+
+        lines = lines & category & vbTab & f & vbTab & path & vbTab & ts & vbCrLf
+        f = Dir$
+    Loop
+    CollectFiles = lines
+End Function
+
+Private Sub SaveTextLocal(ByVal path As String, ByVal content As String)
+    Dim ff As Integer: ff = FreeFile
+    Open path For Output As #ff
+    Print #ff, content
+    Close #ff
+End Sub
+
+' ユーティリティ
+Private Function EnsureTrailSlash(ByVal s As String) As String
+    If Len(s) = 0 Then
+        EnsureTrailSlash = ""
+    ElseIf Right$(s, 1) = "\" Then
+        EnsureTrailSlash = s
+    Else
+        EnsureTrailSlash = s & "\"
+    End If
+End Function
+
+Private Sub MkDirIfMissing(ByVal p As String)
+    On Error Resume Next
+    If Len(Dir$(p, vbDirectory)) = 0 Then MkDir p
+    On Error GoTo 0
+End Sub
+
+
