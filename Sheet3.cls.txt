@@ -16,6 +16,10 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Set colMap = CreateObject("Scripting.Dictionary")
 
     On Error GoTo ErrorHandler
+    ' ★ 行・列まるごとの操作（挿入・削除など）は何もしない
+    If Target.Address = Target.EntireColumn.Address Then Exit Sub
+    If Target.Address = Target.EntireRow.Address Then Exit Sub
+
     Application.EnableEvents = False
 
     ' ▼ どの編集でもまずログ＆黄色塗り（表シートかどうかは中で判定）
