@@ -7,57 +7,77 @@ Public Function NormalizeAccountName(ByVal inputText As String) As String
     Dim result As String
     Dim originalHasSpace As Boolean
 
+    ' 0) 空文字なら即終了
     If Len(inputText) = 0 Then
         NormalizeAccountName = ""
         Exit Function
     End If
 
-    ' 元の文字列にスペースがあったか（個人名判定用）
+    ' 元の文字列にスペースが含まれているか（個人名判定のため保持）
     originalHasSpace = (InStr(inputText, " ") > 0 Or InStr(inputText, "　") > 0)
 
+    ' 1) 改行削除
     result = inputText
+    result = Replace(result, vbCr, "")
+    result = Replace(result, vbLf, "")
 
-    ' 1) 全角英数 → 半角英数
+    ' 2) 全角英数 → 半角英数
     result = StrConv(result, vbNarrow)
 
-    ' 2) ひらがな/全角カナ → 全角カタカナ
+    ' 3) ひらがな → カタカナ（全角）
     result = StrConv(result, vbKatakana)
 
-    ' 3) 記号類の表記ゆれ統一（全角カナ段階で）
-    result = Replace(result, "（", "(")
-    result = Replace(result, "）", ")")
-    result = Replace(result, "〔", "[")
-    result = Replace(result, "〕", "]")
+    ' 4) 全角カタカナ → 半角カタカナ
+    result = StrConv(result, vbNarrow)
 
-    ' 4) 法人略語・営業所略語・事業体略語（全角段階で変換）
+    ' 5) かっこ類を半角へ統一
+    result = NormalizeParentheses(result)
+
+    ' 6) 法人格・営業所・事業体の略称統一
     result = NormalizeCorpAbbr(result)
     result = NormalizeBranchAbbr(result)
     result = NormalizeBusinessAbbr(result)
 
-    ' 5) 全角カタカナ → 半角カタカナ（濁点等含め StrConvが一番安全）
-    result = StrConv(result, vbNarrow)
-
-    ' 6) 小さいカナ → 大きいカナ
+    ' 7) 小さいカナ → 大きいカナ
     result = NormalizeSmallKana(result)
 
-    ' 7) 長音「ｰ/－/ー」→ "-"
+    ' 8) 記号の統一
+    '    長音「ｰ/－/ー」→ "-"
     result = Replace(result, "ｰ", "-")
     result = Replace(result, "－", "-")
     result = Replace(result, "ー", "-")
 
-    ' 8) 中点「・/･」→ "."
+    '    中点「・/･」→ "."
     result = Replace(result, "・", ".")
     result = Replace(result, "･", ".")
-
+    
     ' 9) スペース正規化
     result = NormalizeSpaces(result, originalHasSpace)
 
-    ' 10) 余計なカッコや全角記号の保険除去
+    ' 10) 余計なダブルクォート削除 ＋ Application.Trim
     result = Replace(result, """", "")
     result = Application.Trim(result)
 
     NormalizeAccountName = result
 End Function
+
+
+
+'---------------------------------------------
+' かっこ類を半角へ統一
+'---------------------------------------------
+Private Function NormalizeParentheses(ByVal s As String) As String
+    Dim r As String
+    r = s
+    r = Replace(r, "（", "(")
+    r = Replace(r, "）", ")")
+    r = Replace(r, "〔", "[")
+    r = Replace(r, "〕", "]")
+    NormalizeParentheses = r
+End Function
+
+
+
 
 
 '---------------------------------------------
@@ -79,14 +99,18 @@ Private Function NormalizeSmallKana(ByVal s As String) As String
 End Function
 
 
+
+
+
 '---------------------------------------------
 ' スペース正規化
-' ・個人名：元々スペースがある場合のみ 1つ残す
-' ・法人等：スペースは全部削除
+' ・元文字列にスペースあり  → 全角→半角＋連続スペースを 1 個に圧縮
+' ・元文字列にスペースなし → すべて削除
 '---------------------------------------------
 Private Function NormalizeSpaces(ByVal s As String, ByVal originalHasSpace As Boolean) As String
     Dim r As String
     r = Replace(s, "　", " ")
+
     If originalHasSpace Then
         Do While InStr(r, "  ") > 0
             r = Replace(r, "  ", " ")
@@ -94,13 +118,17 @@ Private Function NormalizeSpaces(ByVal s As String, ByVal originalHasSpace As Bo
     Else
         r = Replace(r, " ", "")
     End If
+
     NormalizeSpaces = Trim(r)
 End Function
 
 
+
+
+
 '---------------------------------------------
-' 法人略語統一（資料のルール反映）
-' 株式会社/有限会社/合同会社/社団法人/財団法人
+' 法人格略称統一（資料＋漏れ対応）
+' 株式会社/有限会社/合同会社/各種法人
 '---------------------------------------------
 Private Function NormalizeCorpAbbr(ByVal s As String) As String
     Dim r As String
@@ -123,22 +151,50 @@ Private Function NormalizeCorpAbbr(ByVal s As String) As String
     r = Replace(r, "(同)", "ﾄﾞ)")
     r = Replace(r, "（同）", "ﾄﾞ)")
 
-    ' 社団法人
+    ' 社団法人（旧称）
     r = Replace(r, "社団法人", "ｼﾔ)")
     r = Replace(r, "(社)", "ｼﾔ)")
     r = Replace(r, "（社）", "ｼﾔ)")
 
-    ' 財団法人
+    ' 財団法人（旧称）
     r = Replace(r, "財団法人", "ｻﾞｲ)")
     r = Replace(r, "(財)", "ｻﾞｲ)")
     r = Replace(r, "（財）", "ｻﾞｲ)")
+
+    ' 学校法人
+    r = Replace(r, "学校法人", "ｶﾞｸ)")
+
+    ' 医療法人
+    r = Replace(r, "医療法人", "ｲﾘ)")
+
+    ' 社会福祉法人
+    r = Replace(r, "社会福祉法人", "ｼﾔ)")
+
+    ' 宗教法人
+    r = Replace(r, "宗教法人", "ｼﾕｳ)")
+
+    ' 一般社団法人 / 公益社団法人
+    r = Replace(r, "一般社団法人", "ｼﾔﾀﾞﾝ)")
+    r = Replace(r, "公益社団法人", "ｺｳｴｷｼﾔ)")
+
+    ' 財団法人系
+    r = Replace(r, "一般財団法人", "ｻﾞｲ)")
+    r = Replace(r, "公益財団法人", "ｺｳｴｷｻﾞ)")
+
+    ' 特定非営利活動法人 / NPO
+    r = Replace(r, "特定非営利活動法人", "NPO)")
+    r = Replace(r, "ＮＰＯ法人", "NPO)")
+    r = Replace(r, "NPO法人", "NPO)")
 
     NormalizeCorpAbbr = r
 End Function
 
 
+
+
+
 '---------------------------------------------
-' 営業所略語（資料のルール反映）
+' 営業所略称統一
 '---------------------------------------------
 Private Function NormalizeBranchAbbr(ByVal s As String) As String
     Dim r As String
@@ -150,19 +206,94 @@ Private Function NormalizeBranchAbbr(ByVal s As String) As String
 End Function
 
 
+
+
+
 '---------------------------------------------
-' 事業体略語（資料のルール反映）
+' 事業体略称統一（協同組合・金融・商工会など）
 '---------------------------------------------
 Private Function NormalizeBusinessAbbr(ByVal s As String) As String
     Dim r As String
     r = s
 
-    r = Replace(r, "協同組合", "ｷﾖｳｸﾐ")
-    r = Replace(r, "農業協同組合", "ﾉｳｷﾖｳ")
-    r = Replace(r, "信用組合", "ｼﾝﾖｳｸﾐ")
-    r = Replace(r, "信用金庫", "ｼﾝﾖｳｷﾝｺ")
-    r = Replace(r, "労働金庫", "ﾛｳﾄﾞｳｷﾝｺ")
+    ' 農協・漁協・生協など（協同組合系）
+    r = Replace(r, "農業協同組合", "ﾉｳｷﾖｳ)")
+    r = Replace(r, "農協", "ﾉｳｷﾖｳ)")
+    r = Replace(r, "漁業協同組合", "ｷﾞﾖｷﾖｳ)")
+    r = Replace(r, "漁協", "ｷﾞﾖｷﾖｳ)")
+    r = Replace(r, "生活協同組合", "ｾｲｷﾖｳ)")
+    r = Replace(r, "生協", "ｾｲｷﾖｳ)")
+    r = Replace(r, "協同組合", "ｷﾖｳﾄﾞｳ)")
+    r = Replace(r, "事業協同組合", "ｼﾞｷﾞﾖｳ)")
+    r = Replace(r, "森林組合", "ｼﾝﾘﾝ)")
+
+    ' 金融系
+    r = Replace(r, "信用金庫", "ｼﾝｷﾝ)")
+    r = Replace(r, "信金", "ｼﾝｷﾝ)")
+    r = Replace(r, "信用組合", "ｼﾝｸﾐ)")
+    r = Replace(r, "信組", "ｼﾝｸﾐ)")
+    r = Replace(r, "労働金庫", "ﾛｳｷﾝ)")
+    r = Replace(r, "労金", "ﾛｳｷﾝ)")
+
+    ' 商工会・振興会
+    r = Replace(r, "商工会議所", "ｼﾖｳｺｳｶｲ)")
+    r = Replace(r, "商工会", "ｼﾖｳｺｳｶｲ)")
+    r = Replace(r, "振興会", "ｼﾝｺｳｶｲ)")
 
     NormalizeBusinessAbbr = r
 End Function
 
+
+
+
+
+'=================================================
+' シート3用：口座名義／口座名義2 の自動正規化
+'=================================================
+Public Sub HandleAccountNormalize(ws As Worksheet, ByVal Target As Range)
+
+    Const HEADER_ROW As Long = 3   '★見出し行は 3 行目と決め打ち
+
+    Dim lastCol As Long
+    Dim c As Long
+    Dim h As String
+    Dim colName1 As Long, colName2 As Long
+
+    ' --- 1) 見出し行（3行目）の右端までを検索 ---
+    lastCol = ws.Cells(HEADER_ROW, ws.Columns.Count).End(xlToLeft).Column
+
+    For c = 1 To lastCol
+        h = CStr(ws.Cells(HEADER_ROW, c).Value)
+
+        ' 見出しのゆらぎを少し吸収
+        h = Replace(h, vbCr, "")
+        h = Replace(h, vbLf, "")
+        h = Replace(h, "　", " ")
+        h = Application.Trim(h)
+
+        If h = "口座名義" Then
+            colName1 = c
+        ElseIf h = "口座名義2" Then
+            colName2 = c
+        End If
+    Next c
+
+    ' 見出しが1つも見つからなければ終了
+    If colName1 = 0 And colName2 = 0 Then Exit Sub
+
+    ' ヘッダー行そのものの編集なら何もしない
+    If Target.Row <= HEADER_ROW Then Exit Sub
+
+    ' 複数セル同時変更（貼り付けなど）は対象外
+    If Target.CountLarge <> 1 Then Exit Sub
+
+    ' 対象列以外は無視
+    If Target.Column <> colName1 And Target.Column <> colName2 Then Exit Sub
+
+    ' 空欄なら何もしない
+    If Trim$(CStr(Target.Value)) = "" Then Exit Sub
+
+    ' --- 2) 実際の変換 ---
+    Target.Value = NormalizeAccountName(CStr(Target.Value))
+
+End Sub

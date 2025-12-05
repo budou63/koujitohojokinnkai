@@ -287,40 +287,7 @@ End If
     End If
 
     ' === 口座名義・口座名義2列が変更されたとき：自動正規化 ===
-    Dim 口座名義列 As Long, 口座名義2列 As Long
-    口座名義列 = ColFrom(colMap, "口座名義")
-    口座名義2列 = ColFrom(colMap, "口座名義2")
-    
-    If 口座名義列 > 0 Or 口座名義2列 > 0 Then
-        Dim targetCols As Variant
-        If 口座名義列 > 0 And 口座名義2列 > 0 Then
-            targetCols = Array(口座名義列, 口座名義2列)
-        ElseIf 口座名義列 > 0 Then
-            targetCols = Array(口座名義列)
-        Else
-            targetCols = Array(口座名義2列)
-        End If
-        
-        Dim colIdx As Variant, targetCol As Long
-        For Each colIdx In targetCols
-            targetCol = CLng(colIdx)
-            If Not Intersect(Target, Me.Columns(targetCol)) Is Nothing Then
-                For Each cell In Intersect(Target, Me.Columns(targetCol))
-                    row = cell.row
-                    If row >= 4 Then
-                        Dim originalValue As String, normalizedValue As String
-                        originalValue = Trim(CStr(cell.value))
-                        If Len(originalValue) > 0 Then
-                            normalizedValue = NormalizeAccountName(originalValue)
-                            If normalizedValue <> originalValue Then
-                                cell.value = normalizedValue
-                            End If
-                        End If
-                    End If
-                Next cell
-            End If
-        Next colIdx
-    End If
+    Call HandleAccountNormalize(Me, Target)
 
 CleanExit:
     Application.EnableEvents = True
