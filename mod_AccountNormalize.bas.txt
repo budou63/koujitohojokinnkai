@@ -3,6 +3,20 @@ Option Explicit
 '=================================================
 ' 口座名義 正規化（振込用 半角カタカナ）
 '=================================================
+
+'---------------------------------------------
+' 法人略語ルール格納用
+'---------------------------------------------
+Private Type AbbrRule
+    term As String          ' 置換対象（元の語）
+    headAbbr As String      ' 先頭にあるときの略語
+    midAbbr As String       ' 中間にあるときの略語
+    tailAbbr As String      ' 末尾にあるときの略語
+End Type
+
+'=================================================
+' 口座名義 正規化メイン
+'=================================================
 Public Function NormalizeAccountName(ByVal inputText As String) As String
     Dim result As String
     Dim originalHasSpace As Boolean
@@ -13,55 +27,53 @@ Public Function NormalizeAccountName(ByVal inputText As String) As String
         Exit Function
     End If
 
-    ' 元の文字列にスペースが含まれているか（個人名判定のため保持）
+    ' 元の文字列にスペースが含まれているか（個人名判定用）
     originalHasSpace = (InStr(inputText, " ") > 0 Or InStr(inputText, "　") > 0)
 
-    ' 1) 改行削除
-    result = inputText
-    result = Replace(result, vbCr, "")
-    result = Replace(result, vbLf, "")
+    ' 改行除去（後続の位置判定を安定させる）
+    result = Replace(Replace(inputText, vbCr, ""), vbLf, "")
 
-    ' 2) 全角英数 → 半角英数
+    ' 1) 全角英数 → 半角英数
     result = StrConv(result, vbNarrow)
 
-    ' 3) ひらがな → カタカナ（全角）
+    ' 2) ひらがな → カタカナ（全角）
     result = StrConv(result, vbKatakana)
 
-    ' 4) 全角カタカナ → 半角カタカナ
+    ' 3) 全角カタカナ → 半角カタカナ
     result = StrConv(result, vbNarrow)
 
-    ' 5) かっこ類を半角へ統一
+    ' 4) かっこ類を半角へ統一
     result = NormalizeParentheses(result)
 
-    ' 6) 法人格・営業所・事業体の略称統一
+    ' 5) 法人格・営業所・事業体の略称統一（位置判定つき）
     result = NormalizeCorpAbbr(result)
     result = NormalizeBranchAbbr(result)
     result = NormalizeBusinessAbbr(result)
 
-    ' 7) 小さいカナ → 大きいカナ
+    ' 6) 小さいカナ → 大きいカナ
     result = NormalizeSmallKana(result)
 
-    ' 8) 記号の統一
-    '    長音「ｰ/－/ー」→ "-"
+    ' 7) 記号の統一（長音・中点）
     result = Replace(result, "ｰ", "-")
     result = Replace(result, "－", "-")
     result = Replace(result, "ー", "-")
-
-    '    中点「・/･」→ "."
     result = Replace(result, "・", ".")
     result = Replace(result, "･", ".")
-    
-    ' 9) スペース正規化
+
+    ' 8) スペース正規化
     result = NormalizeSpaces(result, originalHasSpace)
 
-    ' 10) 余計なダブルクォート削除 ＋ Application.Trim
+    ' 9) 余計なダブルクォート削除＋Trim
     result = Replace(result, """", "")
     result = Application.Trim(result)
 
     NormalizeAccountName = result
 End Function
 
-
+' テストイメージ（参考・Assertはしない）
+' ・株式会社太陽建設工業 → ｶ)ﾀｲﾖｳｹﾝｾﾂｺｳｷﾞﾖｳ
+' ・太陽建設工業株式会社 → ﾀｲﾖｳｹﾝｾﾂｺｳｷﾞﾖｳ(ｶ
+' ・医療法人社団〇〇会   → ｲﾘ)ｼﾔﾀﾞﾝ〇〇ｶｲ（位置で略語が変わる）
 
 '---------------------------------------------
 ' かっこ類を半角へ統一
@@ -76,9 +88,102 @@ Private Function NormalizeParentheses(ByVal s As String) As String
     NormalizeParentheses = r
 End Function
 
+'---------------------------------------------
+' 位置判定付き置換
+'---------------------------------------------
+Private Function ReplaceWithPosition(ByVal s As String, ByVal term As String, _
+    ByVal headAbbr As String, ByVal midAbbr As String, ByVal tailAbbr As String) As String
 
+    Dim pos As Long
+    pos = InStr(1, s, term, vbTextCompare)
 
+    Do While pos > 0
+        Dim rep As String
+        If pos = 1 Then
+            rep = headAbbr                     ' 先頭
+        ElseIf pos + Len(term) - 1 = Len(s) Then
+            rep = tailAbbr                     ' 末尾
+        Else
+            rep = midAbbr                      ' 中間
+        End If
 
+        s = Left$(s, pos - 1) & rep & Mid$(s, pos + Len(term))
+        pos = InStr(pos + Len(rep), s, term, vbTextCompare)
+    Loop
+
+    ReplaceWithPosition = s
+End Function
+
+'---------------------------------------------
+' 法人格略語統一（先頭/中間/末尾で略語形を変える）
+'---------------------------------------------
+Private Function NormalizeCorpAbbr(ByVal s As String) As String
+    Dim rules() As AbbrRule
+    rules = BuildCorpRules()
+
+    Dim i As Long, patterns As Variant, p As Variant
+    For i = LBound(rules) To UBound(rules)
+        patterns = Array(rules(i).term, "(" & rules(i).term & ")")
+        If rules(i).term = "株式会社" Then patterns = Array(rules(i).term, "(" & rules(i).term & ")", "(株)", "㈱")
+        If rules(i).term = "有限会社" Then patterns = Array(rules(i).term, "(" & rules(i).term & ")", "(有)", "㈲")
+
+        For Each p In patterns
+            s = ReplaceWithPosition(s, CStr(p), rules(i).headAbbr, rules(i).midAbbr, rules(i).tailAbbr)
+        Next p
+    Next i
+
+    NormalizeCorpAbbr = s
+End Function
+
+Private Function BuildCorpRules() As AbbrRule()
+    ' 画像「法人略語一覧」を想定：先頭/中間/末尾で略語形を変える
+    Dim tmp() As AbbrRule
+    ReDim tmp(1 To 32)
+
+    tmp(1) = MakeRule("株式会社", "ｶ)", "(ｶ)", "(ｶ")
+    tmp(2) = MakeRule("有限会社", "ﾕ)", "(ﾕ)", "(ﾕ")
+    tmp(3) = MakeRule("合名会社", "ｺﾞﾒ)", "(ｺﾞﾒ)", "(ｺﾞﾒ")
+    tmp(4) = MakeRule("合資会社", "ｺﾞｼ)", "(ｺﾞｼ)", "(ｺﾞｼ")
+    tmp(5) = MakeRule("合同会社", "ﾄﾞ)", "(ﾄﾞ)", "(ﾄﾞ")
+    tmp(6) = MakeRule("医療法人", "ｲﾘ)", "(ｲﾘ)", "(ｲﾘ")
+    tmp(7) = MakeRule("医療法人社団", "ｲﾘ)ｼﾔ", "(ｲﾘ)ｼﾔ", "(ｲﾘ)ｼﾔ")
+    tmp(8) = MakeRule("医療法人財団", "ｲﾘ)ｻﾞｲ", "(ｲﾘ)ｻﾞｲ", "(ｲﾘ)ｻﾞｲ")
+    tmp(9) = MakeRule("社会医療法人", "ｼﾔｶｲ)ｲﾘ", "(ｼﾔｶｲ)ｲﾘ", "(ｼﾔｶｲ)ｲﾘ")
+    tmp(10) = MakeRule("財団法人", "ｻﾞｲ)", "(ｻﾞｲ)", "(ｻﾞｲ")
+    tmp(11) = MakeRule("一般財団法人", "ｲﾂﾊﾟﾝ)ｻﾞｲ", "(ｲﾂﾊﾟﾝ)ｻﾞｲ", "(ｲﾂﾊﾟﾝ)ｻﾞｲ")
+    tmp(12) = MakeRule("公益財団法人", "ｺｳｴｷ)ｻﾞｲ", "(ｺｳｴｷ)ｻﾞｲ", "(ｺｳｴｷ)ｻﾞｲ")
+    tmp(13) = MakeRule("社団法人", "ｼﾔ)", "(ｼﾔ)", "(ｼﾔ")
+    tmp(14) = MakeRule("一般社団法人", "ｲﾂﾊﾟﾝ)ｼﾔ", "(ｲﾂﾊﾟﾝ)ｼﾔ", "(ｲﾂﾊﾟﾝ)ｼﾔ")
+    tmp(15) = MakeRule("公益社団法人", "ｺｳｴｷ)ｼﾔ", "(ｺｳｴｷ)ｼﾔ", "(ｺｳｴｷ)ｼﾔ")
+    tmp(16) = MakeRule("宗教法人", "ｼﾕｳ)", "(ｼﾕｳ)", "(ｼﾕｳ")
+    tmp(17) = MakeRule("学校法人", "ｶﾞｸ)", "(ｶﾞｸ)", "(ｶﾞｸ")
+    tmp(18) = MakeRule("社会福祉法人", "ｼﾔ)ﾌｸｼ", "(ｼﾔ)ﾌｸｼ", "(ｼﾔ)ﾌｸｼ")
+    tmp(19) = MakeRule("更生保護法人", "ｺｳｾｲ)ﾎｺﾞ", "(ｺｳｾｲ)ﾎｺﾞ", "(ｺｳｾｲ)ﾎｺﾞ")
+    tmp(20) = MakeRule("相互会社", "ｿｳｺﾞ)", "(ｿｳｺﾞ)", "(ｿｳｺﾞ")
+    tmp(21) = MakeRule("特定非営利活動法人", "NPO)", "(NPO)", "(NPO")
+    tmp(22) = MakeRule("独立行政法人", "ﾄﾞｸﾘﾂ)ｷﾞﾖｳｾｲ", "(ﾄﾞｸﾘﾂ)ｷﾞﾖｳｾｲ", "(ﾄﾞｸﾘﾂ)ｷﾞﾖｳｾｲ")
+    tmp(23) = MakeRule("弁護士法人", "ﾍﾞﾝｺﾞｼ)", "(ﾍﾞﾝｺﾞｼ)", "(ﾍﾞﾝｺﾞｼ")
+    tmp(24) = MakeRule("有限責任中間法人", "ﾕ)ｾｷﾆﾝﾁｭｳｶﾝ", "(ﾕ)ｾｷﾆﾝﾁｭｳｶﾝ", "(ﾕ)ｾｷﾆﾝﾁｭｳｶﾝ")
+    tmp(25) = MakeRule("無限責任中間法人", "ﾑ)ｾｷﾆﾝﾁｭｳｶﾝ", "(ﾑ)ｾｷﾆﾝﾁｭｳｶﾝ", "(ﾑ)ｾｷﾆﾝﾁｭｳｶﾝ")
+    tmp(26) = MakeRule("行政書士法人", "ｷﾞﾖｳｾｲｼﾖｼ)", "(ｷﾞﾖｳｾｲｼﾖｼ)", "(ｷﾞﾖｳｾｲｼﾖｼ")
+    tmp(27) = MakeRule("司法書士法人", "ｼﾎｳｼﾖｼ)", "(ｼﾎｳｼﾖｼ)", "(ｼﾎｳｼﾖｼ")
+    tmp(28) = MakeRule("税理士法人", "ｾﾞｲﾘｼ)", "(ｾﾞｲﾘｼ)", "(ｾﾞｲﾘｼ")
+    tmp(29) = MakeRule("国立大学法人", "ｺｸﾘﾂ)ﾀﾞｲｶﾞｸ", "(ｺｸﾘﾂ)ﾀﾞｲｶﾞｸ", "(ｺｸﾘﾂ)ﾀﾞｲｶﾞｸ")
+    tmp(30) = MakeRule("公立大学法人", "ｺｳﾘﾂ)ﾀﾞｲｶﾞｸ", "(ｺｳﾘﾂ)ﾀﾞｲｶﾞｸ", "(ｺｳﾘﾂ)ﾀﾞｲｶﾞｸ")
+    tmp(31) = MakeRule("農事組合法人", "ﾉｳｼﾞ)ｸﾐｱｲ", "(ﾉｳｼﾞ)ｸﾐｱｲ", "(ﾉｳｼﾞ)ｸﾐｱｲ")
+    tmp(32) = MakeRule("社会保険労務士法人", "ｼﾔ)ﾎｹﾝﾛｳﾑｼ", "(ｼﾔ)ﾎｹﾝﾛｳﾑｼ", "(ｼﾔ)ﾎｹﾝﾛｳﾑｼ")
+
+    BuildCorpRules = tmp
+End Function
+
+Private Function MakeRule(ByVal term As String, ByVal headAbbr As String, ByVal midAbbr As String, ByVal tailAbbr As String) As AbbrRule
+    Dim r As AbbrRule
+    r.term = term
+    r.headAbbr = headAbbr
+    r.midAbbr = midAbbr
+    r.tailAbbr = tailAbbr
+    MakeRule = r
+End Function
 
 '---------------------------------------------
 ' 小さいカナ → 大きいカナ（半角）
@@ -97,10 +202,6 @@ Private Function NormalizeSmallKana(ByVal s As String) As String
     r = Replace(r, "ｯ", "ﾂ")
     NormalizeSmallKana = r
 End Function
-
-
-
-
 
 '---------------------------------------------
 ' スペース正規化
@@ -122,101 +223,30 @@ Private Function NormalizeSpaces(ByVal s As String, ByVal originalHasSpace As Bo
     NormalizeSpaces = Trim(r)
 End Function
 
-
-
-
-
 '---------------------------------------------
-' 法人格略称統一（資料＋漏れ対応）
-' 株式会社/有限会社/合同会社/各種法人
-'---------------------------------------------
-Private Function NormalizeCorpAbbr(ByVal s As String) As String
-    Dim r As String
-    r = s
-
-    ' 株式会社
-    r = Replace(r, "株式会社", "ｶ)")
-    r = Replace(r, "(株)", "ｶ)")
-    r = Replace(r, "（株）", "ｶ)")
-    r = Replace(r, "㈱", "ｶ)")
-
-    ' 有限会社
-    r = Replace(r, "有限会社", "ﾕ)")
-    r = Replace(r, "(有)", "ﾕ)")
-    r = Replace(r, "（有）", "ﾕ)")
-    r = Replace(r, "㈲", "ﾕ)")
-
-    ' 合同会社
-    r = Replace(r, "合同会社", "ﾄﾞ)")
-    r = Replace(r, "(同)", "ﾄﾞ)")
-    r = Replace(r, "（同）", "ﾄﾞ)")
-
-    ' 社団法人（旧称）
-    r = Replace(r, "社団法人", "ｼﾔ)")
-    r = Replace(r, "(社)", "ｼﾔ)")
-    r = Replace(r, "（社）", "ｼﾔ)")
-
-    ' 財団法人（旧称）
-    r = Replace(r, "財団法人", "ｻﾞｲ)")
-    r = Replace(r, "(財)", "ｻﾞｲ)")
-    r = Replace(r, "（財）", "ｻﾞｲ)")
-
-    ' 学校法人
-    r = Replace(r, "学校法人", "ｶﾞｸ)")
-
-    ' 医療法人
-    r = Replace(r, "医療法人", "ｲﾘ)")
-
-    ' 社会福祉法人
-    r = Replace(r, "社会福祉法人", "ｼﾔ)")
-
-    ' 宗教法人
-    r = Replace(r, "宗教法人", "ｼﾕｳ)")
-
-    ' 一般社団法人 / 公益社団法人
-    r = Replace(r, "一般社団法人", "ｼﾔﾀﾞﾝ)")
-    r = Replace(r, "公益社団法人", "ｺｳｴｷｼﾔ)")
-
-    ' 財団法人系
-    r = Replace(r, "一般財団法人", "ｻﾞｲ)")
-    r = Replace(r, "公益財団法人", "ｺｳｴｷｻﾞ)")
-
-    ' 特定非営利活動法人 / NPO
-    r = Replace(r, "特定非営利活動法人", "NPO)")
-    r = Replace(r, "ＮＰＯ法人", "NPO)")
-    r = Replace(r, "NPO法人", "NPO)")
-
-    NormalizeCorpAbbr = r
-End Function
-
-
-
-
-
-'---------------------------------------------
-' 営業所略称統一
+' 営業所略語（先頭/中間/末尾別）
 '---------------------------------------------
 Private Function NormalizeBranchAbbr(ByVal s As String) As String
-    Dim r As String
-    r = s
-    r = Replace(r, "営業所", "ｴｲ)")
-    r = Replace(r, "(営業所)", "ｴｲ)")
-    r = Replace(r, "（営業所）", "ｴｲ)")
-    NormalizeBranchAbbr = r
+    Dim rules(1 To 2) As AbbrRule
+    rules(1) = MakeRule("営業所", "ｴｲ)", "(ｴｲ)", "(ｴｲ")
+    rules(2) = MakeRule("出張所", "ｼﾕﾂ)", "(ｼﾕﾂ)", "(ｼﾕﾂ")
+
+    Dim i As Long
+    For i = LBound(rules) To UBound(rules)
+        s = ReplaceWithPosition(s, rules(i).term, rules(i).headAbbr, rules(i).midAbbr, rules(i).tailAbbr)
+    Next i
+
+    NormalizeBranchAbbr = s
 End Function
 
-
-
-
-
 '---------------------------------------------
-' 事業体略称統一（協同組合・金融・商工会など）
+' 事業体略語（協同組合・金融・商工会など）
 '---------------------------------------------
 Private Function NormalizeBusinessAbbr(ByVal s As String) As String
     Dim r As String
     r = s
 
-    ' 農協・漁協・生協など（協同組合系）
+    ' 協同組合系
     r = Replace(r, "農業協同組合", "ﾉｳｷﾖｳ)")
     r = Replace(r, "農協", "ﾉｳｷﾖｳ)")
     r = Replace(r, "漁業協同組合", "ｷﾞﾖｷﾖｳ)")
