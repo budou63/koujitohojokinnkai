@@ -16,6 +16,12 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Set colMap = CreateObject("Scripting.Dictionary")
 
     On Error GoTo ErrorHandler
+    
+    ' === 修正ポイント①：1行目（通し番号行）の変更時は処理をスキップ ===
+    If Not Intersect(Target, Me.Rows(1)) Is Nothing Then
+        GoTo CleanExit
+    End If
+    
     ' ★ 行まるごとの操作（挿入・削除など）は何もしない
     If Target.Address = Target.EntireRow.Address Then Exit Sub
 
@@ -25,6 +31,7 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Call LogEditAndHighlight(Target)
 
     繰越語尾 = "〔繰越明許分〕"
+
 
     ' === 見出し名と列番号を記録 ===
     For i = 1 To Me.Cells(3, Columns.Count).End(xlToLeft).Column
@@ -304,6 +311,7 @@ End Sub
 Private Sub Worksheet_SelectionChange(ByVal Target As Range)
     Dim lastCol As Long
     Dim lastColInRow1 As Long
+    Dim eventsBefore As Boolean
     
     On Error Resume Next
     
@@ -319,8 +327,12 @@ Private Sub Worksheet_SelectionChange(ByVal Target As Range)
     End If
     
     ' 見出し列数と1行目の通し番号が一致していない場合、更新
+    ' === 修正ポイント②：RefreshColumnNumbers実行時はイベントをOFFにして無限ループを防止 ===
     If lastCol <> lastColInRow1 Then
+        eventsBefore = Application.EnableEvents
+        Application.EnableEvents = False
         Call RefreshColumnNumbers
+        Application.EnableEvents = eventsBefore
     End If
     
     On Error GoTo 0
