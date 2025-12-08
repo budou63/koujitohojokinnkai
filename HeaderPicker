@@ -7,7 +7,7 @@ Public Canceled As Boolean
 
 ' 内部状態
 Private headerRowNum As Long
-Private allItems As Variant   ' {表示名, 列番号} の2列配列
+Private allItems As Variant   ' {表示テキスト（通し番号+見出し）, 列番号, 見出し名} の3列配列
 Private syncingUI As Boolean  ' ★テキスト/コンボ相互同期のループ防止
 '==========================================================================
 ' --- ここから追記（差し込み用の状態） ---
@@ -37,7 +37,7 @@ Public Sub Init(ByVal headerRow As Long)
 
     If Not last Is Nothing Then
         For i = 0 To lstHeaders.ListCount - 1
-            nm = lstHeaders.List(i, 0)
+            nm = CStr(lstHeaders.List(i, 2))
             For j = 1 To last.Count
                 If 正規化(nm) = 正規化(CStr(last(j))) Then
                     lstHeaders.Selected(i) = True
@@ -57,31 +57,41 @@ End Sub
 ' === 見出し列を読み込む（headerRowNum の行） ===
 Private Sub LoadHeaders()
     Dim ws As Worksheet
-    Set ws = ThisWorkbook.Worksheets("表")   ' 「表」を明示
+    Set ws = ThisWorkbook.Worksheets("表")
 
-    Dim lastCol As Long, i As Long, nm As String
+    Dim lastCol As Long, i As Long
+    Dim nm As String, disp As String, serial As String
     Dim tmp As Collection: Set tmp = New Collection
 
     lastCol = ws.Cells(headerRowNum, ws.Columns.Count).End(xlToLeft).Column
     For i = 1 To lastCol
-        nm = 正規化(CStr(ws.Cells(headerRowNum, i).value))
-        If Len(nm) > 0 Then tmp.Add Array(nm, i)
+        nm = 正規化(CStr(ws.Cells(headerRowNum, i).Value))
+        serial = Trim$(CStr(ws.Cells(1, i).Value))
+
+        If Len(nm) > 0 Then
+            If serial <> "" Then
+                disp = serial & " : " & nm
+            Else
+                disp = nm
+            End If
+            tmp.Add Array(disp, i, nm)
+        End If
     Next
 
-    ' ★ここが抜けていた：allItems を作る
     If tmp.Count = 0 Then
         Erase allItems
         lstHeaders.Clear
         Exit Sub
     End If
 
-    ReDim allItems(1 To tmp.Count, 1 To 2)
+    ReDim allItems(1 To tmp.Count, 1 To 3)
     For i = 1 To tmp.Count
-        allItems(i, 1) = tmp(i)(0) ' 表示名
-        allItems(i, 2) = tmp(i)(1) ' 列番号
+        allItems(i, 1) = tmp(i)(0)
+        allItems(i, 2) = tmp(i)(1)
+        allItems(i, 3) = tmp(i)(2)
     Next
 
-    ApplyFilter ""   ' ← ここでリストに反映
+    ApplyFilter ""
 End Sub
 
 
@@ -92,38 +102,38 @@ Private Sub ApplyFilter(ByVal key As String)
     Dim buf() As Variant, outArr() As Variant
     key = LCase$(key)
 
-    ' 見出しが未準備なら何もしない
     If IsEmpty(allItems) Then
         lstHeaders.Clear
         Exit Sub
     End If
 
-    ' まずは最大サイズでバッファ確保（行×列）
-    ReDim buf(1 To UBound(allItems), 1 To 2)
+    ReDim buf(1 To UBound(allItems), 1 To 3)
     n = 0
 
     For i = 1 To UBound(allItems)
-        If key = "" Or InStr(LCase$(allItems(i, 1)), key) > 0 Then
+        If key = "" Or InStr(LCase$(allItems(i, 3)), key) > 0 Then
             n = n + 1
-            buf(n, 1) = allItems(i, 1) ' 表示名
-            buf(n, 2) = allItems(i, 2) ' 列番号
+            buf(n, 1) = allItems(i, 1)
+            buf(n, 2) = allItems(i, 2)
+            buf(n, 3) = allItems(i, 3)
         End If
     Next
 
-    ' ListBox 初期化
     lstHeaders.Clear
     lstHeaders.ColumnHeads = False
-    lstHeaders.ColumnCount = 2
+    lstHeaders.ColumnCount = 3
 
-    ' ちょうどのサイズの配列にコピーして渡す
     If n > 0 Then
-        ReDim outArr(1 To n, 1 To 2)
+        ReDim outArr(1 To n, 1 To 3)
         For i = 1 To n
             outArr(i, 1) = buf(i, 1)
             outArr(i, 2) = buf(i, 2)
+            outArr(i, 3) = buf(i, 3)
         Next
         lstHeaders.List = outArr
     End If
+
+    lstHeaders.ColumnWidths = "120 pt;0 pt;0 pt"
 End Sub
 
 
@@ -175,11 +185,11 @@ Private Sub cmdOK_Click()
     ' 見出し未準備なら一応ロード
     If IsEmpty(allItems) Then LoadHeaders
 
-    ' ListBox の選択を収集（0列目=表示名, 1列目=列番号）
+    ' ListBox の選択を収集（0列目=表示テキスト, 1列目=列番号, 2列目=見出し名）
     For i = 0 To lstHeaders.ListCount - 1
         If lstHeaders.Selected(i) Then
-            selColsLocal.Add CLng(lstHeaders.List(i, 1))   ' 列番号
-            selectedNames.Add CStr(lstHeaders.List(i, 0))  ' 表示名（保存用）
+            selColsLocal.Add CLng(lstHeaders.List(i, 1))
+            selectedNames.Add CStr(lstHeaders.List(i, 2))
         End If
     Next
 
@@ -332,7 +342,7 @@ Private Sub btnPresetSave_Click()
 
     ' 現在の選択見出しを収集
     For i = 0 To lstHeaders.ListCount - 1
-        If lstHeaders.Selected(i) Then selNames.Add CStr(lstHeaders.List(i, 0))
+        If lstHeaders.Selected(i) Then selNames.Add CStr(lstHeaders.List(i, 2))
     Next
     If selNames.Count = 0 Then
         MsgBox "保存する見出しが選ばれていません。", vbExclamation
@@ -391,7 +401,7 @@ Private Sub btnPresetLoad_Click()
     For j = 1 To lst.Count
         Target = 正規化(CStr(lst(j)))
         For i = 0 To lstHeaders.ListCount - 1
-            If 正規化(CStr(lstHeaders.List(i, 0))) = Target Then
+            If 正規化(CStr(lstHeaders.List(i, 2))) = Target Then
                 lstHeaders.Selected(i) = True
                 Exit For
             End If
