@@ -9,11 +9,11 @@ Public Function WM_TemplateDir() As String
 End Function
 '---------------------------------------------------------------------
 
-' --- [前3行] ---
-' 指定フォルダの Word 文書（.docx / .docm/ .dotm）を列挙して返す（フルパス）
+'--- WM_ListTemplates 修正ここから ---
+' 指定フォルダ配下の Word 文書（.docx / .docm/ .dotm）を再帰的に列挙して返す（フルパス）
 Public Function WM_ListTemplates() As Collection
     Dim out As New Collection
-    Dim fso As Object, fld As Object, f As Object, dirPath As String, ext As String
+    Dim fso As Object, rootFld As Object, dirPath As String
 
     dirPath = WM_TemplateDir()
     If Right$(dirPath, 1) <> "\" Then dirPath = dirPath & "\"
@@ -25,11 +25,8 @@ Public Function WM_ListTemplates() As Collection
         Exit Function
     End If
 
-    Set fld = fso.GetFolder(dirPath)
-    For Each f In fld.files
-        ext = LCase$(fso.GetExtensionName(f.path))
-        If ext = "docx" Or ext = "docm" Or ext = "dotm" Then out.Add f.path
-    Next
+    Set rootFld = fso.GetFolder(dirPath)
+    WM_CollectTemplatesInFolder rootFld, out, fso
 
     Set WM_ListTemplates = out
     Exit Function
@@ -37,6 +34,25 @@ EH:
     ' 失敗時は空コレクション
     Set WM_ListTemplates = out
 End Function
+'--- WM_ListTemplates 修正ここまで ---
+
+'--- WM_ListTemplates ヘルパーここから ---
+' 指定フォルダ内およびサブフォルダを再帰的に走査し、対象拡張子を収集
+Private Sub WM_CollectTemplatesInFolder(ByVal fld As Object, ByRef out As Collection, ByVal fso As Object)
+    Dim f As Object, subFld As Object, ext As String
+
+    On Error Resume Next    ' 個別フォルダでのアクセス不可はスキップ
+
+    For Each f In fld.files
+        ext = LCase$(fso.GetExtensionName(f.path))
+        If ext = "docx" Or ext = "docm" Or ext = "dotm" Then out.Add f.path
+    Next
+
+    For Each subFld In fld.SubFolders
+        WM_CollectTemplatesInFolder subFld, out, fso
+    Next
+End Sub
+'--- WM_ListTemplates ヘルパーここまで ---
 
 ' --- [後3行] ---
 
