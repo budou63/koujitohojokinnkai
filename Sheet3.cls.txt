@@ -16,8 +16,7 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Set colMap = CreateObject("Scripting.Dictionary")
 
     On Error GoTo ErrorHandler
-    ' ★ 行・列まるごとの操作（挿入・削除など）は何もしない
-    If Target.Address = Target.EntireColumn.Address Then Exit Sub
+    ' ★ 行まるごとの操作（挿入・削除など）は何もしない
     If Target.Address = Target.EntireRow.Address Then Exit Sub
 
     Application.EnableEvents = False
@@ -299,7 +298,56 @@ ErrorHandler:
     Resume CleanExit
 End Sub
 
+'---------------------------------------------
+' 選択変更時：1行目の通し番号と見出し列数を比較し、ズレていたら更新
+'---------------------------------------------
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+    Dim lastCol As Long
+    Dim lastColInRow1 As Long
+    
+    On Error Resume Next
+    
+    ' 見出し行（3行目）の最終列を取得
+    lastCol = Me.Cells(3, Me.Columns.Count).End(xlToLeft).Column
+    
+    ' 1行目の最終列の値を取得（空の場合は0）
+    lastColInRow1 = 0
+    If lastCol > 0 Then
+        If IsNumeric(Me.Cells(1, lastCol).Value) Then
+            lastColInRow1 = CLng(Me.Cells(1, lastCol).Value)
+        End If
+    End If
+    
+    ' 見出し列数と1行目の通し番号が一致していない場合、更新
+    If lastCol <> lastColInRow1 Then
+        Call RefreshColumnNumbers
+    End If
+    
+    On Error GoTo 0
+End Sub
+
 ' ===== ここからヘルパー（表シートの End Sub の後ろに置く）=====
+
+'---------------------------------------------
+' 1行目の通し番号を振り直す（見出し行の最終列まで）
+'---------------------------------------------
+Private Sub RefreshColumnNumbers()
+    Dim lastCol As Long
+    Dim c As Long
+    
+    ' 見出し行（3行目）の最終列を取得
+    lastCol = Me.Cells(3, Me.Columns.Count).End(xlToLeft).Column
+    
+    ' 1行目のA列～lastCol列をクリア
+    If lastCol > 0 Then
+        Me.Range(Me.Cells(1, 1), Me.Cells(1, lastCol)).ClearContents
+        
+        ' 通し番号を設定（値のみ、関数は使わない）
+        For c = 1 To lastCol
+            Me.Cells(1, c).Value = c
+        Next c
+    End If
+End Sub
 
 Public Function NormalizeHeader(ByVal s As String) As String
     s = Replace(s, vbCr, "")
