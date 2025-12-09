@@ -1007,11 +1007,9 @@ Sub 転記とガントチャート生成_自動抽出付き()
                     With ws工期表.Cells(i, startCol + j)
                         If currentDate >= startDate And currentDate <= endDate Then
                             If isPaid Then
-                                ' ★支払済み（赤ガント）は非表示（透明）
-                                .Interior.ColorIndex = xlColorIndexNone
+                                .Interior.Color = RGB(255, 0, 0) ' 赤：支払済み
                             Else
-                                ' ★青ガントのみ表示
-                                .Interior.Color = RGB(0, 112, 192)
+                                .Interior.Color = RGB(91, 155, 213) ' 青：通常
                             End If
                         End If
                     End With
@@ -1265,5 +1263,4 @@ Private Sub SafeMove(ByVal src As String, ByVal dst As String)
     End If
     On Error GoTo 0
 End Sub
-
 
