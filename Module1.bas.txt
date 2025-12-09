@@ -1026,7 +1026,7 @@ End Sub
 Sub 工期表_リセット()
 
     Dim ws As Worksheet
- Dim startCol As Long           ' ★開始列は後で決定
+    Dim startCol As Long           ' ★開始列は後で決定
     Dim maxDays As Long: maxDays = 730
     Dim headerRow工期 As Long: headerRow工期 = 2
     Dim clearRowStart As Long: clearRowStart = 3
@@ -1035,7 +1035,12 @@ Sub 工期表_リセット()
     Set ws = Worksheets("工期表")
     Application.ScreenUpdating = False
 
-' === ガント開始列を“見出し行2の最右非日付セルの次列”で動的決定 ===
+    ' === フィルターがかかっている場合は解除（全行表示に戻す） ===
+    On Error Resume Next
+    ws.ShowAllData
+    On Error GoTo 0
+
+    ' === ガント開始列を"見出し行2の最右非日付セルの次列"で動的決定 ===
     Dim lastHeadCol As Long, lastNonDateCol As Long, c As Long, v
     lastHeadCol = ws.Cells(headerRow工期, ws.Columns.Count).End(xlToLeft).Column
     lastNonDateCol = 1
@@ -1053,8 +1058,8 @@ Sub 工期表_リセット()
     ' 最終行を取得（転記コード列が基準）
     lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).row
 
-    ' A列?H列をクリア（転記コード＋転記項目）
-    ws.Range(ws.Cells(clearRowStart, 1), ws.Cells(lastRow, 8)).ClearContents
+    ' A列～J列をクリア（転記コード＋転記項目）
+    ws.Range(ws.Cells(clearRowStart, 1), ws.Cells(lastRow, 10)).ClearContents
 
     ' I列以降（ガントチャート部分）をクリア
     For i = clearRowStart To lastRow
