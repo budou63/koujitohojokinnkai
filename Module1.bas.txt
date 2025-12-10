@@ -1062,7 +1062,7 @@ Sub 工期表_リセット()
 End Sub
 
 '========================================
-' 赤いガントセルのみ非表示にする
+' 赤いガントバーが1つでもある行を丸ごと非表示
 '========================================
 Sub HideRedGanttBars()
 
@@ -1071,7 +1071,7 @@ Sub HideRedGanttBars()
     Dim maxDays As Long: maxDays = 730
     Dim headerRow工期 As Long: headerRow工期 = 2
     Dim lastRow As Long, i As Long, j As Long
-    Dim cell As Range
+    Dim hasRedBar As Boolean
 
     Set ws = Worksheets("工期表")
     Application.ScreenUpdating = False
@@ -1099,19 +1099,25 @@ Sub HideRedGanttBars()
     For i = 3 To lastRow
         ' 転記コードがある行だけ処理
         If Trim(ws.Cells(i, 1).value) <> "" Then
+            hasRedBar = False
+            
             ' ガント範囲（startCol ～ startCol + maxDays - 1）をチェック
             For j = 0 To maxDays - 1
-                Set cell = ws.Cells(i, startCol + j)
-                
-                If cell.Interior.Color = RGB(255, 0, 0) Then
-                    cell.Interior.ColorIndex = xlNone   ' 赤いガントバーだけ消す
+                If ws.Cells(i, startCol + j).Interior.Color = RGB(255, 0, 0) Then
+                    hasRedBar = True
+                    Exit For   ' 赤いセルが1つでも見つかったら即座に判定終了
                 End If
             Next j
+            
+            ' 赤いガントバーがあれば行全体を非表示
+            If hasRedBar Then
+                ws.Rows(i).Hidden = True
+            End If
         End If
     Next i
 
     Application.ScreenUpdating = True
-    MsgBox "赤いガントバーを非表示にしました。", vbInformation
+    MsgBox "赤いガントバーを含む行を非表示にしました。", vbInformation
 
 End Sub
 
