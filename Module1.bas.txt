@@ -987,7 +987,7 @@ Sub 転記とガントチャート生成_自動抽出付き()
                 End If
             Next j
 
-            ' ガント描画（青または赤）
+            ' ガント描画（支払い済み＝赤／未払い＝青）
             If IsDate(ws工期表.Cells(i, colMap工期("始（最終）")).value) And IsDate(ws工期表.Cells(i, colMap工期("終（最終）")).value) Then
                 startDate = ws工期表.Cells(i, colMap工期("始（最終）")).value
                 endDate = ws工期表.Cells(i, colMap工期("終（最終）")).value
@@ -995,8 +995,10 @@ Sub 転記とガントチャート生成_自動抽出付き()
                     Dim currentDate As Date: currentDate = baseDate + j
                     With ws工期表.Cells(i, startCol + j)
                         If currentDate >= startDate And currentDate <= endDate Then
-                            If Not isPaid Then
-                                .Interior.Color = RGB(91, 155, 213) ' 青：通常
+                            If isPaid Then
+                                .Interior.Color = RGB(255, 0, 0)          ' 支払い済み：赤
+                            Else
+                                .Interior.Color = RGB(91, 155, 213)       ' 未払い：青
                             End If
                         End If
                     End With
@@ -1056,6 +1058,60 @@ Sub 工期表_リセット()
 
     MsgBox "工期表のリセットが完了しました。", vbInformation
     Application.ScreenUpdating = True
+
+End Sub
+
+'========================================
+' 赤いガントセルのみ非表示にする
+'========================================
+Sub HideRedGanttBars()
+
+    Dim ws As Worksheet
+    Dim startCol As Long           ' ガント開始列（動的決定）
+    Dim maxDays As Long: maxDays = 730
+    Dim headerRow工期 As Long: headerRow工期 = 2
+    Dim lastRow As Long, i As Long, j As Long
+    Dim cell As Range
+
+    Set ws = Worksheets("工期表")
+    Application.ScreenUpdating = False
+
+    ' === ガント開始列を"見出し行2の最右非日付セルの次列"で動的決定 ===
+    ' 既存ロジックと完全に同じ
+    Dim lastHeadCol As Long, lastNonDateCol As Long, c As Long, v
+    lastHeadCol = ws.Cells(headerRow工期, ws.Columns.Count).End(xlToLeft).Column
+    lastNonDateCol = 1
+    For c = lastHeadCol To 1 Step -1
+        v = ws.Cells(headerRow工期, c).value
+        If Len(v) > 0 Then
+            If Not IsDate(v) Then
+                lastNonDateCol = c
+                Exit For
+            End If
+        End If
+    Next c
+    startCol = lastNonDateCol + 1
+
+    ' 転記コード列（A列）を基準に最終行を取得
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).row
+
+    ' データ行（3行目以降）をループ
+    For i = 3 To lastRow
+        ' 転記コードがある行だけ処理
+        If Trim(ws.Cells(i, 1).value) <> "" Then
+            ' ガント範囲（startCol ～ startCol + maxDays - 1）をチェック
+            For j = 0 To maxDays - 1
+                Set cell = ws.Cells(i, startCol + j)
+                
+                If cell.Interior.Color = RGB(255, 0, 0) Then
+                    cell.Interior.ColorIndex = xlNone   ' 赤いガントバーだけ消す
+                End If
+            Next j
+        End If
+    Next i
+
+    Application.ScreenUpdating = True
+    MsgBox "赤いガントバーを非表示にしました。", vbInformation
 
 End Sub
 
