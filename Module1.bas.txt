@@ -39,28 +39,17 @@ Public Sub 現バージョン保存()
     ' ③名前定義（構造化 + flat）
     ExportDefinedNames_Both
 
-    ' ★★★ ここを追加：manifest（構造ファイル）出力を実行 → 所定フォルダへ移動
-    On Error Resume Next
-    Application.Run "ExportWorkbookManifest_Custom"   ' ← mod_ManifestExport に実装済みのマクロ名
-    If Err.Number = 0 Then
-        ' 既定ではブックと同じ場所に出る想定（workbook_manifest.txt / columns_map.csv）
-        SafeMove ThisWorkbook.path & "\workbook_manifest.txt", MANIFEST_TXT
-        SafeMove ThisWorkbook.path & "\columns_map.csv", MANIFEST_MAP
-    Else
-        ' 見つからない等は無視（必要なら MsgBox に変更）
-        Err.Clear
-    End If
-    On Error GoTo 0
-
-
-
     ' ④ブック丸ごとコピー（時刻付き）
     SaveWorkbookSnapshot
     
-    ' =========================
-    ' ★ manifest 出力を追加
-    ' =========================
+    ' ⑤ manifest 出力（ここに一本化：mod_ManifestExport 側の実装を使う）
+    On Error Resume Next
     mod_ManifestExport.ExportWorkbookManifest_Custom OUT_DIR
+    If Err.Number <> 0 Then
+        ' 必要であればエラー時の処理（MsgBox 等）をここに追加する
+        Err.Clear
+    End If
+    On Error GoTo 0
 
     MsgBox "Snapshot & 集約完了（" & Format(Timer - t0, "0.0") & "s）" & vbCrLf & _
            "転送用: " & FLAT_DIR, vbInformation
@@ -1006,9 +995,7 @@ Sub 転記とガントチャート生成_自動抽出付き()
                     Dim currentDate As Date: currentDate = baseDate + j
                     With ws工期表.Cells(i, startCol + j)
                         If currentDate >= startDate And currentDate <= endDate Then
-                            If isPaid Then
-                                .Interior.Color = RGB(255, 0, 0) ' 赤：支払済み
-                            Else
+                            If Not isPaid Then
                                 .Interior.Color = RGB(91, 155, 213) ' 青：通常
                             End If
                         End If
