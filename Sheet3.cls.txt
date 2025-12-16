@@ -1,12 +1,3 @@
-VERSION 1.0 CLASS
-BEGIN
-  MultiUse = -1  'True
-END
-Attribute VB_Name = "Sheet3"
-Attribute VB_GlobalNameSpace = False
-Attribute VB_Creatable = False
-Attribute VB_PredeclaredId = True
-Attribute VB_Exposed = True
 Private Sub CommandButton1_Click()
 
 End Sub
@@ -15,152 +6,129 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Dim i As Long, lastRow As Long
     Dim usedNumbers As Object
     Dim nextNumber As Long
-    Dim cell As Range, editCell As Range
-    Dim �ԍ� As String
-    Dim ������ As Long, �̔ԗ� As Long, �ׁX�ߗ� As Long
-    Dim �J�z��� As String
+    Dim cell As Range
+    Dim 番号 As String
+    Dim 件名列 As Long, 採番列 As Long, 細々節列 As Long
+    Dim 繰越語尾 As String
     Dim row As Long, val As String
     Dim srcCol As Long, condCol As Long, destCol As Long
     Dim colMap As Object
-    Dim lastEditorCol As Long
-    Dim userID As String
-    Dim displayName As String
-    Dim editRow As Long
     Set colMap = CreateObject("Scripting.Dictionary")
 
     On Error GoTo ErrorHandler
     
-    ' === �C���|�C���g�@�F1�s�ځi�ʂ��ԍ��s�j�̕ύX���͏������X�L�b�v ===
+    ' === 修正ポイント①：1行目（通し番号行）の変更時は処理をスキップ ===
     If Not Intersect(Target, Me.Rows(1)) Is Nothing Then
         GoTo CleanExit
     End If
     
-    ' �� �s�܂邲�Ƃ̑���i�}���E�폜�Ȃǁj�͉������Ȃ�
+    ' ★ 行まるごとの操作（挿入・削除など）は何もしない
     If Target.Address = Target.EntireRow.Address Then Exit Sub
 
     Application.EnableEvents = False
 
-    ' �� �ǂ̕ҏW�ł��܂����O�����F�h��i�\�V�[�g���ǂ����͒��Ŕ���j
+    ' ▼ どの編集でもまずログ＆黄色塗り（表シートかどうかは中で判定）
     Call LogEditAndHighlight(Target)
 
-    ' === �ŏI�ҏW�҂̕\�����M�iID→���O�ɕύX�j ===
-    lastEditorCol = GetHeaderColumn(Me, EDITLOG_HDR_EDITOR)
-    If lastEditorCol > 0 Then
-        userID = Trim$(Environ$("USERNAME"))
-        If userID = "" Then userID = Application.UserName
-
-        Call RegisterIDIfNew(userID)
-        displayName = ResolveUserDisplayName(userID)
-
-        Dim editRange As Range
-        Set editRange = Intersect(Target, Me.Rows(EDITLOG_DATA_START & ":" & Me.Rows.Count))
-        If Not editRange Is Nothing Then
-            For Each editCell In editRange.Cells
-                editRow = editCell.row
-                Me.Cells(editRow, lastEditorCol).value = displayName
-            Next editCell
-        End If
-    End If
-
-    �J�z��� = "�k�J�z�������l"
+    繰越語尾 = "〔繰越明許分〕"
 
 
-    ' === ���o�����Ɨ�ԍ����L�^ ===
+    ' === 見出し名と列番号を記録 ===
     For i = 1 To Me.Cells(3, Columns.Count).End(xlToLeft).Column
         colMap(Me.Cells(3, i).value) = i
         Select Case Me.Cells(3, i).value
-            Case "����": ������ = i
-            Case "�̔�": �̔ԗ� = i
-            Case "�ׁX�߁k�J�z�������l": �ׁX�ߗ� = i
+            Case "件名": 件名列 = i
+            Case "採番": 採番列 = i
+            Case "細々節〔繰越明許分〕": 細々節列 = i
         End Select
     Next i
 
-        ' === �ƎҖ����͎��F��\�ҁE�Z�����������́i���o�����x�[�X�ŃY���Ȃ��j ===
+        ' === 業者名入力時：代表者・住所を自動入力（見出し名ベースでズレない） ===
     Dim headerRow As Long: headerRow = 3
-    Dim col�Ǝ� As Long, col�N�ē� As Long, col��\�� As Long, col�Z�� As Long
+    Dim col業者 As Long, col起案日 As Long, col代表者 As Long, col住所 As Long
 
-    ' �����Ȃ��̌��o���ɍ��킹�����i�K�v�ɉ����Ēǉ�OK�j
-    col�Ǝ� = ColFrom(colMap, "�{�H�ƎҁE����", "�ƎҖ�", "�{�H�Ǝ�", "����")
-    col�N�ē� = ColFrom(colMap, "�N�ē�", "�N�ē��t")
-    col��\�� = ColFrom(colMap, "��\��", "��\�Җ�", "�S����")   ' �S���҂��\�҂ɗ��p�������ꍇ�̕ی�
-    col�Z�� = ColFrom(colMap, "�Z��", "���ݒn")
+    ' ★あなたの見出しに合わせた候補（必要に応じて追加OK）
+    col業者 = ColFrom(colMap, "施工業者・債権者", "業者名", "施工業者", "債権者")
+    col起案日 = ColFrom(colMap, "起案日", "起案日付")
+    col代表者 = ColFrom(colMap, "代表者", "代表者名", "担当者")   ' 担当者を代表者に流用したい場合の保険
+    col住所 = ColFrom(colMap, "住所", "所在地")
 
-    If col�Ǝ� > 0 And col�N�ē� > 0 And col��\�� > 0 And col�Z�� > 0 Then
-        Dim rng�Ǝ� As Range, c As Range
-        Set rng�Ǝ� = Intersect(Target, Me.Range(Me.Cells(headerRow + 1, col�Ǝ�), Me.Cells(Rows.Count, col�Ǝ�).End(xlUp)))
-        If Not rng�Ǝ� Is Nothing Then
-            For Each c In rng�Ǝ�.Cells
+    If col業者 > 0 And col起案日 > 0 And col代表者 > 0 And col住所 > 0 Then
+        Dim rng業者 As Range, c As Range
+        Set rng業者 = Intersect(Target, Me.Range(Me.Cells(headerRow + 1, col業者), Me.Cells(Rows.Count, col業者).End(xlUp)))
+        If Not rng業者 Is Nothing Then
+            For Each c In rng業者.Cells
                 If Trim(c.value) <> "" Then
                     Dim key As String, rep As String, addr As String
-                    key = Replace(Replace(Application.Trim(Replace(CStr(c.value), "�@", " ")), vbCr, ""), vbLf, "")
+                    key = Replace(Replace(Application.Trim(Replace(CStr(c.value), "　", " ")), vbCr, ""), vbLf, "")
 
-                    GetLatestRepAddr Me, headerRow, col�Ǝ�, col�N�ē�, col��\��, col�Z��, c.row, key, rep, addr
-                    If rep <> "" Then Me.Cells(c.row, col��\��).value = rep
-                    If addr <> "" Then Me.Cells(c.row, col�Z��).value = addr
+                    GetLatestRepAddr Me, headerRow, col業者, col起案日, col代表者, col住所, c.row, key, rep, addr
+                    If rep <> "" Then Me.Cells(c.row, col代表者).value = rep
+                    If addr <> "" Then Me.Cells(c.row, col住所).value = addr
                 End If
             Next c
         End If
     End If
 
 
-    ' === �ׁX�߂̌���ǉ� ===
-    If �ׁX�ߗ� > 0 Then
-        If Not Intersect(Target, Me.Range(Me.Cells(4, �ׁX�ߗ�), Me.Cells(1000, �ׁX�ߗ�))) Is Nothing Then
-            For Each cell In Intersect(Target, Me.Range(Me.Cells(4, �ׁX�ߗ�), Me.Cells(1000, �ׁX�ߗ�)))
+    ' === 細々節の語尾追加 ===
+    If 細々節列 > 0 Then
+        If Not Intersect(Target, Me.Range(Me.Cells(4, 細々節列), Me.Cells(1000, 細々節列))) Is Nothing Then
+            For Each cell In Intersect(Target, Me.Range(Me.Cells(4, 細々節列), Me.Cells(1000, 細々節列)))
                 If Trim(cell.value) <> "" Then
                     Dim original As String, normalized As String
                     original = cell.value
-                    normalized = Replace(Replace(Replace(Trim(original), vbCr, ""), vbLf, ""), "�@", "")
-                    If Right(normalized, Len(�J�z���)) <> �J�z��� Then
-                        cell.value = Trim(original) & �J�z���
+                    normalized = Replace(Replace(Replace(Trim(original), vbCr, ""), vbLf, ""), "　", "")
+                    If Right(normalized, Len(繰越語尾)) <> 繰越語尾 Then
+                        cell.value = Trim(original) & 繰越語尾
                     End If
                 End If
             Next cell
         End If
     End If
 
-    ' === �̔ԏ��� ===
-    If ������ > 0 And �̔ԗ� > 0 Then
-        If Not Intersect(Target, Me.Range(Me.Cells(4, ������), Me.Cells(Rows.Count, ������).End(xlUp))) Is Nothing Then
+    ' === 採番処理 ===
+    If 件名列 > 0 And 採番列 > 0 Then
+        If Not Intersect(Target, Me.Range(Me.Cells(4, 件名列), Me.Cells(Rows.Count, 件名列).End(xlUp))) Is Nothing Then
             Set usedNumbers = CreateObject("Scripting.Dictionary")
-            lastRow = Me.Cells(Me.Rows.Count, ������).End(xlUp).row
+            lastRow = Me.Cells(Me.Rows.Count, 件名列).End(xlUp).row
             For i = 4 To lastRow
-                �ԍ� = Me.Cells(i, �̔ԗ�).value
-                If �ԍ� <> "" Then usedNumbers(CStr(Format(�ԍ�, "000"))) = True
+                番号 = Me.Cells(i, 採番列).value
+                If 番号 <> "" Then usedNumbers(CStr(Format(番号, "000"))) = True
             Next i
-            For Each cell In Intersect(Target, Me.Range(Me.Cells(4, ������), Me.Cells(Rows.Count, ������).End(xlUp)))
-                If Trim(cell.value) <> "" And Me.Cells(cell.row, �̔ԗ�).value = "" Then
+            For Each cell In Intersect(Target, Me.Range(Me.Cells(4, 件名列), Me.Cells(Rows.Count, 件名列).End(xlUp)))
+                If Trim(cell.value) <> "" And Me.Cells(cell.row, 採番列).value = "" Then
                     nextNumber = 1
                     Do While usedNumbers.Exists(Format(nextNumber, "000"))
                         nextNumber = nextNumber + 1
                     Loop
-                    Me.Cells(cell.row, �̔ԗ�).value = Format(nextNumber, "000")
+                    Me.Cells(cell.row, 採番列).value = Format(nextNumber, "000")
                     usedNumbers.Add Format(nextNumber, "000"), True
                 End If
             Next cell
         End If
     End If
     
-    ' === �H���I�����̔��f ===
-    Dim �H���y�A As Variant
-    �H���y�A = Array( _
-        Array("�I�@", "�ύX���e�A", "�I�A"), _
-        Array("�I�A", "�ύX���e�B", "�I�B"), _
-        Array("�I�B", "�ύX���e�C", "�I�C"), _
-        Array("�Ia", "�ύX���eb", "�Ib"), _
-        Array("�Ib", "�ύX���ec", "�Ic"), _
-        Array("�Ic", "�ύX���ed", "�Id") _
+    ' === 工期終了日の反映 ===
+    Dim 工期ペア As Variant
+    工期ペア = Array( _
+        Array("終①", "変更内容②", "終②"), _
+        Array("終②", "変更内容③", "終③"), _
+        Array("終③", "変更内容④", "終④"), _
+        Array("終a", "変更内容b", "終b"), _
+        Array("終b", "変更内容c", "終c"), _
+        Array("終c", "変更内容d", "終d") _
     )
-    For i = LBound(�H���y�A) To UBound(�H���y�A)
-        If colMap.Exists(�H���y�A(i)(0)) And colMap.Exists(�H���y�A(i)(1)) And colMap.Exists(�H���y�A(i)(2)) Then
-            srcCol = colMap(�H���y�A(i)(0))
-            condCol = colMap(�H���y�A(i)(1))
-            destCol = colMap(�H���y�A(i)(2))
+    For i = LBound(工期ペア) To UBound(工期ペア)
+        If colMap.Exists(工期ペア(i)(0)) And colMap.Exists(工期ペア(i)(1)) And colMap.Exists(工期ペア(i)(2)) Then
+            srcCol = colMap(工期ペア(i)(0))
+            condCol = colMap(工期ペア(i)(1))
+            destCol = colMap(工期ペア(i)(2))
             If Not Intersect(Target, Me.Range(Me.Cells(4, condCol), Me.Cells(Rows.Count, condCol).End(xlUp))) Is Nothing Then
                 For Each cell In Intersect(Target, Me.Range(Me.Cells(4, condCol), Me.Cells(Rows.Count, condCol).End(xlUp)))
                     row = cell.row
                     val = Trim(cell.value)
-                    If val = "" Or val = "�H������" Then
+                    If val = "" Or val = "工期延期" Then
                         Me.Cells(row, destCol).value = ""
                     Else
                         Me.Cells(row, destCol).value = Me.Cells(row, srcCol).value
@@ -170,15 +138,15 @@ Private Sub Worksheet_Change(ByVal Target As Range)
         End If
     Next i
 
-    ' === �ύX���e���ہX�J�z���܂Ƃ߂Ĕ��f ===
-    Dim �p�^�[�� As Variant
-    �p�^�[�� = Array( _
-      Array("�ύX���e�A", "�����S�z�@", "�����S�z�A", "�ύX�z�A", "�݌v���z�@", "�݌v���z�A", "�H�����e�@", "�H�����e�A", "�⏕�Ώۊz�@", "�⏕�Ώۊz�A", "����@", "����A", "�⏕�z�@", "�⏕�z�A", "�P�s�@", "�P�s�A", "�@"), _
-      Array("�ύX���e�B", "�����S�z�A", "�����S�z�B", "�ύX�z�B", "�݌v���z�A", "�݌v���z�B", "�H�����e�A", "�H�����e�B", "�⏕�Ώۊz�A", "�⏕�Ώۊz�B", "����A", "����B", "�⏕�z�A", "�⏕�z�B", "�P�s�A", "�P�s�B", "�A"), _
-      Array("�ύX���e�C", "�����S�z�B", "�����S�z�C", "�ύX�z�C", "�݌v���z�B", "�݌v���z�C", "�H�����e�B", "�H�����e�C", "�⏕�Ώۊz�B", "�⏕�Ώۊz�C", "����B", "����C", "�⏕�z�B", "�⏕�z�C", "�P�s�B", "�P�s�C", "�B"), _
-      Array("�ύX���eb", "�����S�za", "�����S�zb", "�ύX�zb", "�݌v���za", "�݌v���zb", "�H�����ea", "�H�����eb", "�⏕�Ώۊza", "�⏕�Ώۊzb", "���a", "���b", "�⏕�za", "�⏕�zb", "�P�sa", "�P�sb", "a"), _
-      Array("�ύX���ec", "�����S�zb", "�����S�zc", "�ύX�zc", "�݌v���zb", "�݌v���zc", "�H�����eb", "�H�����ec", "�⏕�Ώۊzb", "�⏕�Ώۊzc", "���b", "���c", "�⏕�zb", "�⏕�zc", "�P�sb", "�P�sc", "b"), _
-      Array("�ύX���ed", "�����S�zc", "�����S�zd", "�ύX�zd", "�݌v���zc", "�݌v���zd", "�H�����ec", "�H�����ed", "�⏕�Ώۊzc", "�⏕�Ώۊzd", "���c", "���d", "�⏕�zc", "�⏕�zd", "�P�sc", "�P�sd", "c") _
+    ' === 変更内容＆丸々繰越をまとめて反映 ===
+    Dim パターン As Variant
+    パターン = Array( _
+      Array("変更内容②", "債務負担額①", "債務負担額②", "変更額②", "設計金額①", "設計金額②", "工事内容①", "工事内容②", "補助対象額①", "補助対象額②", "国費率①", "国費率②", "補助額①", "補助額②", "単市①", "単市②", "①"), _
+      Array("変更内容③", "債務負担額②", "債務負担額③", "変更額③", "設計金額②", "設計金額③", "工事内容②", "工事内容③", "補助対象額②", "補助対象額③", "国費率②", "国費率③", "補助額②", "補助額③", "単市②", "単市③", "②"), _
+      Array("変更内容④", "債務負担額③", "債務負担額④", "変更額④", "設計金額③", "設計金額④", "工事内容③", "工事内容④", "補助対象額③", "補助対象額④", "国費率③", "国費率④", "補助額③", "補助額④", "単市③", "単市④", "③"), _
+      Array("変更内容b", "債務負担額a", "債務負担額b", "変更額b", "設計金額a", "設計金額b", "工事内容a", "工事内容b", "補助対象額a", "補助対象額b", "国費率a", "国費率b", "補助額a", "補助額b", "単市a", "単市b", "a"), _
+      Array("変更内容c", "債務負担額b", "債務負担額c", "変更額c", "設計金額b", "設計金額c", "工事内容b", "工事内容c", "補助対象額b", "補助対象額c", "国費率b", "国費率c", "補助額b", "補助額c", "単市b", "単市c", "b"), _
+      Array("変更内容d", "債務負担額c", "債務負担額d", "変更額d", "設計金額c", "設計金額d", "工事内容c", "工事内容d", "補助対象額c", "補助対象額d", "国費率c", "国費率d", "補助額c", "補助額d", "単市c", "単市d", "c") _
     )
 
     Dim condName As String, fromName As String, toName As String, changeName As String
@@ -187,24 +155,24 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Dim amt3From As String, amt3To As String, amt4From As String, amt4To As String
     Dim suffixFrom As String
 
-    For i = LBound(�p�^�[��) To UBound(�p�^�[��)
-        condName = �p�^�[��(i)(0)
-        fromName = �p�^�[��(i)(1)
-        toName = �p�^�[��(i)(2)
-        changeName = �p�^�[��(i)(3)
-        designFrom = �p�^�[��(i)(4)
-        designTo = �p�^�[��(i)(5)
-        workFrom = �p�^�[��(i)(6)
-        workTo = �p�^�[��(i)(7)
-        amt1From = �p�^�[��(i)(8)
-        amt1To = �p�^�[��(i)(9)
-        amt2From = �p�^�[��(i)(10)
-        amt2To = �p�^�[��(i)(11)
-        amt3From = �p�^�[��(i)(12)
-        amt3To = �p�^�[��(i)(13)
-        amt4From = �p�^�[��(i)(14)
-        amt4To = �p�^�[��(i)(15)
-        suffixFrom = �p�^�[��(i)(16)
+    For i = LBound(パターン) To UBound(パターン)
+        condName = パターン(i)(0)
+        fromName = パターン(i)(1)
+        toName = パターン(i)(2)
+        changeName = パターン(i)(3)
+        designFrom = パターン(i)(4)
+        designTo = パターン(i)(5)
+        workFrom = パターン(i)(6)
+        workTo = パターン(i)(7)
+        amt1From = パターン(i)(8)
+        amt1To = パターン(i)(9)
+        amt2From = パターン(i)(10)
+        amt2To = パターン(i)(11)
+        amt3From = パターン(i)(12)
+        amt3To = パターン(i)(13)
+        amt4From = パターン(i)(14)
+        amt4To = パターン(i)(15)
+        suffixFrom = パターン(i)(16)
 
         If colMap.Exists(condName) Then
             condCol = colMap(condName)
@@ -214,21 +182,21 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                     val = Trim(cell.value)
 
                     Select Case val
-                        Case "���z�ύX", "�C���t���X���C�h"
+                        Case "増額変更", "インフレスライド"
                             If IsNumeric(Me.Cells(row, colMap(fromName)).value) And IsNumeric(Me.Cells(row, colMap(changeName)).value) Then
                                 Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value + Me.Cells(row, colMap(changeName)).value
                             Else
                                 Me.Cells(row, colMap(toName)).value = ""
                             End If
 
-                        Case "���z�ύX"
+                        Case "減額変更"
                             If IsNumeric(Me.Cells(row, colMap(fromName)).value) And IsNumeric(Me.Cells(row, colMap(changeName)).value) Then
                                 Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value - Me.Cells(row, colMap(changeName)).value
                             Else
                                 Me.Cells(row, colMap(toName)).value = ""
                             End If
 
-                        Case "�H������"
+                        Case "工期延期"
                             Me.Cells(row, colMap(changeName)).value = 0
                             Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value
                             Me.Cells(row, colMap(designTo)).value = Me.Cells(row, colMap(designFrom)).value
@@ -238,7 +206,7 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                             Me.Cells(row, colMap(amt3To)).value = Me.Cells(row, colMap(amt3From)).value
                             Me.Cells(row, colMap(amt4To)).value = Me.Cells(row, colMap(amt4From)).value
 
-                        Case "�y���ύX"
+                        Case "軽微変更"
                             Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value
                             Me.Cells(row, colMap(designTo)).value = Me.Cells(row, colMap(designFrom)).value
                             Me.Cells(row, colMap(workTo)).value = ""
@@ -248,7 +216,7 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                             Me.Cells(row, colMap(amt4To)).value = Me.Cells(row, colMap(amt4From)).value
                             Me.Cells(row, colMap(changeName)).value = ""
 
-                        Case "�ہX�J�z", "�O������J�z"
+                        Case "丸々繰越", "前金払後繰越"
                             Dim clearCols As Variant: clearCols = Array(changeName, toName, designTo, amt1To, amt2To, amt3To, amt4To)
                             Dim cname As Variant
                             For Each cname In clearCols
@@ -260,7 +228,7 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                                 Me.Cells(row, colMap(workTo)).value = Me.Cells(row, colMap(workFrom)).value
                             End If
                             Dim fld As Variant
-                            For Each fld In Array("�n", "�I", "�݌v���z", "�����S�z", "�⏕�Ώۊz", "���", "�⏕�z", "�P�s", "�H�����e")
+                            For Each fld In Array("始", "終", "設計金額", "債務負担額", "補助対象額", "国費率", "補助額", "単市", "工事内容")
                                 If colMap.Exists(fld & suffixFrom) And colMap.Exists(fld & "a") Then
                                     Me.Cells(row, colMap(fld & "a")).value = Me.Cells(row, colMap(fld & suffixFrom)).value
                                 End If
@@ -278,8 +246,8 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                     End Select
 
 
-' �P�s = �����S�z - �⏕�Ώۊz
-If val = "���z�ύX" Or val = "���z�ύX" Or val = "�H������" Or val = "�y���ύX" Or val = "�C���t���X���C�h" Then
+' 単市 = 債務負担額 - 補助対象額
+If val = "増額変更" Or val = "減額変更" Or val = "工期延期" Or val = "軽微変更" Or val = "インフレスライド" Then
     If colMap.Exists(toName) And colMap.Exists(amt1To) And colMap.Exists(amt4To) Then
         If IsNumeric(Me.Cells(row, colMap(toName)).value) And IsNumeric(Me.Cells(row, colMap(amt1To)).value) Then
             Me.Cells(row, colMap(amt4To)).value = Me.Cells(row, colMap(toName)).value - Me.Cells(row, colMap(amt1To)).value
@@ -294,29 +262,29 @@ End If
         End If
     Next i
 
-    ' === W��܂���X�񂪕ύX���ꂽ�Ƃ��FA��ɃR�����g��\�� ===
-    If colMap.Exists("�ŏI�����S�z�i���v�j") And colMap.Exists("�⏕�Ώۊz�i���Ɣ�x�[�X�j") Then
-        Dim ���� As Long, �⏕�� As Long
-        ���� = colMap("�ŏI�����S�z�i���v�j")
-        �⏕�� = colMap("�⏕�Ώۊz�i���Ɣ�x�[�X�j")
+    ' === W列またはX列が変更されたとき：A列にコメントを表示 ===
+    If colMap.Exists("最終債務負担額（合計）") And colMap.Exists("補助対象額（事業費ベース）") Then
+        Dim 債務列 As Long, 補助列 As Long
+        債務列 = colMap("最終債務負担額（合計）")
+        補助列 = colMap("補助対象額（事業費ベース）")
 
-        If Not Intersect(Target, Me.Columns(����)) Is Nothing Or Not Intersect(Target, Me.Columns(�⏕��)) Is Nothing Then
+        If Not Intersect(Target, Me.Columns(債務列)) Is Nothing Or Not Intersect(Target, Me.Columns(補助列)) Is Nothing Then
             For Each cell In Target
                 row = cell.row
                 If row >= 4 Then
-                    Dim valW As Variant, valX As Variant, �R�����g���e As String
-                    valW = Me.Cells(row, ����).value
-                    valX = Me.Cells(row, �⏕��).value
+                    Dim valW As Variant, valX As Variant, コメント内容 As String
+                    valW = Me.Cells(row, 債務列).value
+                    valX = Me.Cells(row, 補助列).value
 
-                    With Me.Cells(row, 1) ' A��
-                        ' �����R�����g�폜
+                    With Me.Cells(row, 1) ' A列
+                        ' 既存コメント削除
                         If Not .Comment Is Nothing Then .Comment.Delete
 
-                        ' �����ɒl������΃R�����g�ǉ�
+                        ' 両方に値があればコメント追加
                         If valW <> "" And valX <> "" Then
-                            �R�����g���e = "�ŏI���F" & Format(valW, "#,##0") & "�~" & vbCrLf & _
-                                           "�⏕�ΏہF" & Format(valX, "#,##0") & "�~"
-                            .AddComment Text:=�R�����g���e
+                            コメント内容 = "最終債務：" & Format(valW, "#,##0") & "円" & vbCrLf & _
+                                           "補助対象：" & Format(valX, "#,##0") & "円"
+                            .AddComment Text:=コメント内容
                         End If
                     End With
                 End If
@@ -324,7 +292,7 @@ End If
         End If
     End If
 
-    ' === �������`�E�������`2�񂪕ύX���ꂽ�Ƃ��F�������K�� ===
+    ' === 口座名義・口座名義2列が変更されたとき：自動正規化 ===
     Call HandleAccountNormalize(Me, Target)
 
 CleanExit:
@@ -333,12 +301,12 @@ CleanExit:
 
 
 ErrorHandler:
-    MsgBox "�G���[���������܂����F" & Err.Description, vbExclamation
+    MsgBox "エラーが発生しました：" & Err.Description, vbExclamation
     Resume CleanExit
 End Sub
 
 '---------------------------------------------
-' �I��ύX���F1�s�ڂ̒ʂ��ԍ��ƌ��o���񐔂��r���A�Y���Ă�����X�V
+' 選択変更時：1行目の通し番号と見出し列数を比較し、ズレていたら更新
 '---------------------------------------------
 Private Sub Worksheet_SelectionChange(ByVal Target As Range)
     Dim lastCol As Long
@@ -347,10 +315,10 @@ Private Sub Worksheet_SelectionChange(ByVal Target As Range)
     
     On Error Resume Next
     
-    ' ���o���s�i3�s�ځj�̍ŏI����擾
+    ' 見出し行（3行目）の最終列を取得
     lastCol = Me.Cells(3, Me.Columns.Count).End(xlToLeft).Column
     
-    ' 1�s�ڂ̍ŏI��̒l���擾�i��̏ꍇ��0�j
+    ' 1行目の最終列の値を取得（空の場合は0）
     lastColInRow1 = 0
     If lastCol > 0 Then
         If IsNumeric(Me.Cells(1, lastCol).value) Then
@@ -358,8 +326,8 @@ Private Sub Worksheet_SelectionChange(ByVal Target As Range)
         End If
     End If
     
-    ' ���o���񐔂�1�s�ڂ̒ʂ��ԍ�����v���Ă��Ȃ��ꍇ�A�X�V
-    ' === �C���|�C���g�A�FRefreshColumnNumbers���s���̓C�x���g��OFF�ɂ��Ė������[�v��h�~ ===
+    ' 見出し列数と1行目の通し番号が一致していない場合、更新
+    ' === 修正ポイント②：RefreshColumnNumbers実行時はイベントをOFFにして無限ループを防止 ===
     If lastCol <> lastColInRow1 Then
         eventsBefore = Application.EnableEvents
         Application.EnableEvents = False
@@ -370,23 +338,23 @@ Private Sub Worksheet_SelectionChange(ByVal Target As Range)
     On Error GoTo 0
 End Sub
 
-' ===== ��������w���p�[�i�\�V�[�g�� End Sub �̌��ɒu���j=====
+' ===== ここからヘルパー（表シートの End Sub の後ろに置く）=====
 
 '---------------------------------------------
-' 1�s�ڂ̒ʂ��ԍ���U�蒼���i���o���s�̍ŏI��܂Łj
+' 1行目の通し番号を振り直す（見出し行の最終列まで）
 '---------------------------------------------
 Private Sub RefreshColumnNumbers()
     Dim lastCol As Long
     Dim c As Long
     
-    ' ���o���s�i3�s�ځj�̍ŏI����擾
+    ' 見出し行（3行目）の最終列を取得
     lastCol = Me.Cells(3, Me.Columns.Count).End(xlToLeft).Column
     
-    ' 1�s�ڂ�A��`lastCol����N���A
+    ' 1行目のA列～lastCol列をクリア
     If lastCol > 0 Then
         Me.Range(Me.Cells(1, 1), Me.Cells(1, lastCol)).ClearContents
         
-        ' �ʂ��ԍ���ݒ�i�l�̂݁A�֐��͎g��Ȃ��j
+        ' 通し番号を設定（値のみ、関数は使わない）
         For c = 1 To lastCol
             Me.Cells(1, c).value = c
         Next c
@@ -397,23 +365,23 @@ Public Function NormalizeHeader(ByVal s As String) As String
     s = Replace(s, vbCr, "")
     s = Replace(s, vbLf, "")
     s = Replace(s, """", "")
-    s = Replace(s, "�@", " ")
-    s = Replace(s, "�i", "("): s = Replace(s, "�j", ")")
-    s = Replace(s, "�k", "["): s = Replace(s, "�l", "]")
+    s = Replace(s, "　", " ")
+    s = Replace(s, "（", "("): s = Replace(s, "）", ")")
+    s = Replace(s, "〔", "["): s = Replace(s, "〕", "]")
     s = Application.Trim(s)
     NormalizeHeader = s
 End Function
 
 Public Function ColFrom(ByVal colMap As Object, ParamArray names() As Variant) As Long
     Dim i As Long, key As Variant
-    ' 1) ���S��v
+    ' 1) 完全一致
     For i = LBound(names) To UBound(names)
         If colMap.Exists(CStr(names(i))) Then
             ColFrom = colMap(CStr(names(i)))
             Exit Function
         End If
     Next i
-    ' 2) ���K�����Ĉ�v
+    ' 2) 正規化して一致
     For Each key In colMap.Keys
         For i = LBound(names) To UBound(names)
             If NormalizeHeader(CStr(key)) = NormalizeHeader(CStr(names(i))) Then
@@ -426,7 +394,7 @@ Public Function ColFrom(ByVal colMap As Object, ParamArray names() As Variant) A
 End Function
 
 Public Function NormName(ByVal s As String) As String
-    s = Replace(s, "�@", " ")
+    s = Replace(s, "　", " ")
     s = Replace(s, vbCr, "")
     s = Replace(s, vbLf, "")
     s = Application.Trim(s)
@@ -434,7 +402,7 @@ Public Function NormName(ByVal s As String) As String
 End Function
 
 Public Sub GetLatestRepAddr(ws As Worksheet, headerRow As Long, _
-    col�Ǝ� As Long, col�N�ē� As Long, col��\�� As Long, col�Z�� As Long, _
+    col業者 As Long, col起案日 As Long, col代表者 As Long, col住所 As Long, _
     currentRow As Long, key As String, rep As String, addr As String)
 
     Dim lastRow As Long, r As Long
@@ -442,24 +410,24 @@ Public Sub GetLatestRepAddr(ws As Worksheet, headerRow As Long, _
     Dim repAny As String, addrAny As String
 
     rep = "": addr = "": maxDateAny = 0: maxDateFilled = 0
-    lastRow = ws.Cells(ws.Rows.Count, col�Ǝ�).End(xlUp).row
+    lastRow = ws.Cells(ws.Rows.Count, col業者).End(xlUp).row
 
     For r = headerRow + 1 To lastRow
         If r <> currentRow Then
-            If NormName(CStr(ws.Cells(r, col�Ǝ�).value)) = NormName(key) Then
-                If IsDate(ws.Cells(r, col�N�ē�).value) Then
-                    Dim d As Date: d = ws.Cells(r, col�N�ē�).value
-                    Dim repTmp As String: repTmp = CStr(ws.Cells(r, col��\��).value)
-                    Dim addrTmp As String: addrTmp = CStr(ws.Cells(r, col�Z��).value)
+            If NormName(CStr(ws.Cells(r, col業者).value)) = NormName(key) Then
+                If IsDate(ws.Cells(r, col起案日).value) Then
+                    Dim d As Date: d = ws.Cells(r, col起案日).value
+                    Dim repTmp As String: repTmp = CStr(ws.Cells(r, col代表者).value)
+                    Dim addrTmp As String: addrTmp = CStr(ws.Cells(r, col住所).value)
 
-                    ' �ŐV�i���g��ł��X�V�j
+                    ' 最新（中身空でも更新）
                     If d > maxDateAny Then
                         maxDateAny = d
                         repAny = repTmp
                         addrAny = addrTmp
                     End If
 
-                    ' �u��\��or�Z���̂ǂ��炩�����Ă���v�ŐV
+                    ' 「代表者or住所のどちらか入っている」最新
                     If (repTmp <> "" Or addrTmp <> "") And d > maxDateFilled Then
                         maxDateFilled = d
                         rep = repTmp
@@ -470,7 +438,7 @@ Public Sub GetLatestRepAddr(ws As Worksheet, headerRow As Long, _
         End If
     Next r
 
-    ' �ǂ�����󂾂����ꍇ�͍ŐV�s�̒l�i��̉\��������j�Ńt�H�[���o�b�N
+    ' どちらも空だった場合は最新行の値（空の可能性もある）でフォールバック
     If rep = "" And addr = "" Then
         rep = repAny: addr = addrAny
     End If
@@ -480,4 +448,3 @@ End Sub
 
 
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              

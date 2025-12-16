@@ -1,62 +1,61 @@
-Attribute VB_Name = "Module1"
 Option Explicit
 
-'==== o—Íæi––”ö \ •K{j====
-Private Const OUT_DIR As String = "\\filesv15\“y–Ø‰Û\H–‚Æ•â•‹à‘ä’ \"   ' š‚±‚±‚ğ•ÏX
-Private Const FLAT_DIR As String = OUT_DIR & "flat\"  ' “]‘——p‚ÌW–ñƒtƒHƒ‹ƒ_
-Private Const CSV_LATEST As String = OUT_DIR & "csv\Œ‹‡CSV_latest.csv"  ' šQGIS‚ªQÆ‚·‚éŒÅ’èCSV
+'==== å‡ºåŠ›å…ˆï¼ˆæœ«å°¾ \ å¿…é ˆï¼‰====
+Private Const OUT_DIR As String = "\\filesv15\åœŸæœ¨èª²\å·¥äº‹ã¨è£œåŠ©é‡‘å°å¸³\"   ' â˜…ã“ã“ã‚’å¤‰æ›´
+Private Const FLAT_DIR As String = OUT_DIR & "flat\"  ' è»¢é€ç”¨ã®é›†ç´„ãƒ•ã‚©ãƒ«ãƒ€
+Private Const CSV_LATEST As String = OUT_DIR & "csv\çµåˆCSV_latest.csv"  ' â˜…QGISãŒå‚ç…§ã™ã‚‹å›ºå®šCSV
 
-' ==== manifest o—ÍæiV‹Kj ====
+' ==== manifest å‡ºåŠ›å…ˆï¼ˆæ–°è¦ï¼‰ ====
 Private Const MANIFEST_DIR As String = OUT_DIR & "manifest\"
 Private Const MANIFEST_TXT As String = MANIFEST_DIR & "workbook_manifest.txt"
 Private Const MANIFEST_MAP As String = MANIFEST_DIR & "columns_map.csv"
 
-' VBIDE QÆ‚È‚µ—p‚ÌŒ^’è”
+' VBIDE å‚ç…§ãªã—ç”¨ã®å‹å®šæ•°
 Private Const vbext_ct_StdModule As Long = 1
 Private Const vbext_ct_ClassModule As Long = 2
 Private Const vbext_ct_MSForm   As Long = 3
 Private Const vbext_ct_Document As Long = 100
 
-'================= ˆê”­Às =================
-Public Sub Œ»ƒo[ƒWƒ‡ƒ“•Û‘¶()
+'================= ä¸€ç™ºå®Ÿè¡Œ =================
+Public Sub ç¾ãƒãƒ¼ã‚¸ãƒ§ãƒ³ä¿å­˜()
     Dim t0 As Double: t0 = Timer
 
-    ' \‘¢‰»o—Í‚ÌƒfƒBƒŒƒNƒgƒŠ
+    ' æ§‹é€ åŒ–å‡ºåŠ›ã®ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒª
     Mk OUT_DIR
     Mk OUT_DIR & "src\": Mk OUT_DIR & "src\modules\": Mk OUT_DIR & "src\classes\": Mk OUT_DIR & "src\forms\": Mk OUT_DIR & "src\documents\"
     Mk OUT_DIR & "sheets\": Mk OUT_DIR & "names\": Mk OUT_DIR & "bin\"
-    Mk OUT_DIR & "csv\"   ' š ’Ç‰ÁFŒÅ’è–¼CSV‚Ì’u‚«ê
-    ' “]‘——pi–ˆ‰ñƒNƒŠ[ƒ“j
+    Mk OUT_DIR & "csv\"   ' â˜… è¿½åŠ ï¼šå›ºå®šåCSVã®ç½®ãå ´
+    ' è»¢é€ç”¨ï¼ˆæ¯å›ã‚¯ãƒªãƒ¼ãƒ³ï¼‰
     Mk FLAT_DIR: CleanDir FLAT_DIR
-    ' ššš ‚±‚±‚ğ’Ç‰ÁFmanifest o—Íæ
+    ' â˜…â˜…â˜… ã“ã“ã‚’è¿½åŠ ï¼šmanifest å‡ºåŠ›å…ˆ
     Mk MANIFEST_DIR
-    ' ‡@VBAi\‘¢‰» + flatj
+    ' â‘ VBAï¼ˆæ§‹é€ åŒ– + flatï¼‰
     ExportVbaAsTxt_Both
 
-    ' ‡AƒV[ƒgi\‘¢‰» + flatj
+    ' â‘¡ã‚·ãƒ¼ãƒˆï¼ˆæ§‹é€ åŒ– + flatï¼‰
     ExportSheets_TSV_Both
 
-    ' ‡B–¼‘O’è‹`i\‘¢‰» + flatj
+    ' â‘¢åå‰å®šç¾©ï¼ˆæ§‹é€ åŒ– + flatï¼‰
     ExportDefinedNames_Both
 
-    ' ‡CƒuƒbƒNŠÛ‚²‚ÆƒRƒs[i•t‚«j
+    ' â‘£ãƒ–ãƒƒã‚¯ä¸¸ã”ã¨ã‚³ãƒ”ãƒ¼ï¼ˆæ™‚åˆ»ä»˜ãï¼‰
     SaveWorkbookSnapshot
     
-    ' ‡D manifest o—Íi‚±‚±‚Éˆê–{‰»Fmod_ManifestExport ‘¤‚ÌÀ‘•‚ğg‚¤j
+    ' â‘¤ manifest å‡ºåŠ›ï¼ˆã“ã“ã«ä¸€æœ¬åŒ–ï¼šmod_ManifestExport å´ã®å®Ÿè£…ã‚’ä½¿ã†ï¼‰
     On Error Resume Next
     mod_ManifestExport.ExportWorkbookManifest_Custom OUT_DIR
     If Err.Number <> 0 Then
-        ' •K—v‚Å‚ ‚ê‚ÎƒGƒ‰[‚Ìˆ—iMsgBox “™j‚ğ‚±‚±‚É’Ç‰Á‚·‚é
+        ' å¿…è¦ã§ã‚ã‚Œã°ã‚¨ãƒ©ãƒ¼æ™‚ã®å‡¦ç†ï¼ˆMsgBox ç­‰ï¼‰ã‚’ã“ã“ã«è¿½åŠ ã™ã‚‹
         Err.Clear
     End If
     On Error GoTo 0
 
-    MsgBox "Snapshot & W–ñŠ®—¹i" & Format(Timer - t0, "0.0") & "sj" & vbCrLf & _
-           "“]‘——p: " & FLAT_DIR, vbInformation
+    MsgBox "Snapshot & é›†ç´„å®Œäº†ï¼ˆ" & Format(Timer - t0, "0.0") & "sï¼‰" & vbCrLf & _
+           "è»¢é€ç”¨: " & FLAT_DIR, vbInformation
 End Sub
 '===========================================
 
-'--- ‡@ VBA ‚ğ .txt ‚Åo—Íi\‘¢‰» + flatj
+'--- â‘  VBA ã‚’ .txt ã§å‡ºåŠ›ï¼ˆæ§‹é€ åŒ– + flatï¼‰
 Private Sub ExportVbaAsTxt_Both()
     Dim vbComps As Object, c As Object
     Set vbComps = ThisWorkbook.VBProject.VBComponents
@@ -64,10 +63,10 @@ Private Sub ExportVbaAsTxt_Both()
     Dim baseFolder As String, dest As String, flatName As String
     Dim ext As String, tmpDir As String, exportPath As String, frxPath As String
 
-    ' ˆêo—Íæi‚È‚¯‚ê‚Îì¬j
+    ' ä¸€æ™‚å‡ºåŠ›å…ˆï¼ˆãªã‘ã‚Œã°ä½œæˆï¼‰
     tmpDir = Environ$("TEMP") & "\vba_export_tmp\"
     On Error Resume Next
-    Mk tmpDir                    ' © Module1‚É‚ ‚é Mk ƒTƒuƒ‹[ƒ`ƒ“‚ğg—p
+    Mk tmpDir                    ' â† Module1ã«ã‚ã‚‹ Mk ã‚µãƒ–ãƒ«ãƒ¼ãƒãƒ³ã‚’ä½¿ç”¨
     On Error GoTo 0
 
     For Each c In vbComps
@@ -84,7 +83,7 @@ Private Sub ExportVbaAsTxt_Both()
                 flatName = "src_forms_" & c.name & ".frm.txt"
                 ext = ".frm"
 
-            Case vbext_ct_Document   ' š ThisWorkbook / Sheet(1)c‚È‚Ç
+            Case vbext_ct_Document   ' â˜… ThisWorkbook / Sheet(1)â€¦ãªã©
                 baseFolder = "src\documents\"
                 dest = c.name & ".cls.txt"
                 flatName = "src_documents_" & c.name & ".cls.txt"
@@ -97,26 +96,26 @@ Private Sub ExportVbaAsTxt_Both()
                 ext = ".cls"
 
             Case Else
-                ext = ""             ' ‚»‚Ì‘¼‚ÍƒXƒLƒbƒv
+                ext = ""             ' ãã®ä»–ã¯ã‚¹ã‚­ãƒƒãƒ—
         End Select
 
         If ext <> "" Then
             exportPath = tmpDir & c.name & ext
             On Error Resume Next
             Kill exportPath
-            Kill tmpDir & c.name & ".frx"   ' ƒtƒH[ƒ€—pƒoƒCƒiƒŠ
+            Kill tmpDir & c.name & ".frx"   ' ãƒ•ã‚©ãƒ¼ãƒ ç”¨ãƒã‚¤ãƒŠãƒª
             On Error GoTo 0
 
-            ' À‘Ì‚ğ‘‚«o‚µi.bas / .cls / .frmj¦UserForm ‚Í“¯–¼ .frx ‚ào—Í‚³‚ê‚é
+            ' å®Ÿä½“ã‚’æ›¸ãå‡ºã—ï¼ˆ.bas / .cls / .frmï¼‰â€»UserForm ã¯åŒå .frx ã‚‚å‡ºåŠ›ã•ã‚Œã‚‹
             c.Export exportPath
 
             If Len(Dir$(exportPath)) > 0 Then
-                ' \‘¢‰»i.txt‚É‚µ‚Ä•Û‘¶j
+                ' æ§‹é€ åŒ–ï¼ˆ.txtã«ã—ã¦ä¿å­˜ï¼‰
                 SaveText OUT_DIR & baseFolder & dest, ReadAllText(exportPath)
-                ' flatiš Replace ‚ÅˆÓ–¡‚Ì‚È‚¢’uŠ·‚ğ‚µ‚Ä‚¢‚½‰ÓŠ‚ğC³j
+                ' flatï¼ˆâ˜… Replace ã§æ„å‘³ã®ãªã„ç½®æ›ã‚’ã—ã¦ã„ãŸç®‡æ‰€ã‚’ä¿®æ­£ï¼‰
                 SaveText FLAT_DIR & flatName, ReadAllText(exportPath)
 
-                ' UserForm ‚Ì .frx ‚ÍƒoƒCƒiƒŠ ¨ ‚»‚Ì‚Ü‚ÜƒRƒs[
+                ' UserForm ã® .frx ã¯ãƒã‚¤ãƒŠãƒª â†’ ãã®ã¾ã¾ã‚³ãƒ”ãƒ¼
                 If c.Type = vbext_ct_MSForm Then
                     frxPath = tmpDir & c.name & ".frx"
                     If Len(Dir$(frxPath)) > 0 Then
@@ -127,7 +126,7 @@ Private Sub ExportVbaAsTxt_Both()
                     End If
                 End If
 
-                ' ƒNƒŠ[ƒ“ƒAƒbƒv
+                ' ã‚¯ãƒªãƒ¼ãƒ³ã‚¢ãƒƒãƒ—
                 On Error Resume Next
                 Kill exportPath
                 If frxPath <> "" Then Kill frxPath
@@ -138,7 +137,7 @@ Private Sub ExportVbaAsTxt_Both()
 End Sub
 
 
-'--- ‡A ƒV[ƒg UsedRange ‚ğ TSV.txti\‘¢‰» + flatj
+'--- â‘¡ ã‚·ãƒ¼ãƒˆ UsedRange ã‚’ TSV.txtï¼ˆæ§‹é€ åŒ– + flatï¼‰
 Private Sub ExportSheets_TSV_Both()
     Dim ws As Worksheet, ur As Range, nm As String
     For Each ws In ThisWorkbook.Worksheets
@@ -150,7 +149,7 @@ Private Sub ExportSheets_TSV_Both()
             fPath = OUT_DIR & "sheets\" & nm & "_formulas.tsv.txt"
             SaveText vPath, RangeToTsv(ur, True)
             SaveText fPath, RangeToTsv(ur, False)
-            ' flatiƒtƒ@ƒCƒ‹–¼‚ÉƒtƒHƒ‹ƒ_–¼‚ğ•t—^j
+            ' flatï¼ˆãƒ•ã‚¡ã‚¤ãƒ«åã«ãƒ•ã‚©ãƒ«ãƒ€åã‚’ä»˜ä¸ï¼‰
             SaveText FLAT_DIR & "sheets_" & nm & "_values.tsv.txt", RangeToTsv(ur, True)
             SaveText FLAT_DIR & "sheets_" & nm & "_formulas.tsv.txt", RangeToTsv(ur, False)
         End If
@@ -158,7 +157,7 @@ Private Sub ExportSheets_TSV_Both()
     Next
 End Sub
 
-'--- ‡B –¼‘O’è‹`i\‘¢‰» + flatj
+'--- â‘¢ åå‰å®šç¾©ï¼ˆæ§‹é€ åŒ– + flatï¼‰
 Private Sub ExportDefinedNames_Both()
     Dim sb As String, nm As name, scope As String
     sb = "Name" & vbTab & "RefersTo" & vbTab & "Scope" & vbTab & "Visible" & vbCrLf
@@ -172,7 +171,7 @@ Private Sub ExportDefinedNames_Both()
     SaveText FLAT_DIR & "names_defined_names.tsv.txt", sb
 End Sub
 
-'--- ‡C ƒuƒbƒN‚ğ•t‚«‚Å bin\ ‚É•Û‘¶
+'--- â‘£ ãƒ–ãƒƒã‚¯ã‚’æ™‚åˆ»ä»˜ãã§ bin\ ã«ä¿å­˜
 Private Sub SaveWorkbookSnapshot()
     Dim ts As String: ts = Format(Now, "yyyymmdd_HhNnSs")
     Dim base As String: base = GetBaseName(ThisWorkbook.name)
@@ -182,7 +181,7 @@ Private Sub SaveWorkbookSnapshot()
     ThisWorkbook.SaveCopyAs outPath
 End Sub
 
-'========== ƒ†[ƒeƒBƒŠƒeƒB ==========
+'========== ãƒ¦ãƒ¼ãƒ†ã‚£ãƒªãƒ†ã‚£ ==========
 Private Sub Mk(p As String)
     If Len(Dir(p, vbDirectory)) = 0 Then MkDir p
 End Sub
@@ -204,7 +203,7 @@ Private Sub SaveText(ByVal path As String, ByVal content As String)
     Print #ff, content
     Close #ff
 End Sub
-'--- ƒeƒLƒXƒgƒtƒ@ƒCƒ‹‘S‘Ì‚ğˆÀ‘S‚É“Ç‚İ‚ñ‚Å•¶š—ñ‚Å•Ô‚·iBinaryƒ‚[ƒhj ---
+'--- ãƒ†ã‚­ã‚¹ãƒˆãƒ•ã‚¡ã‚¤ãƒ«å…¨ä½“ã‚’å®‰å…¨ã«èª­ã¿è¾¼ã‚“ã§æ–‡å­—åˆ—ã§è¿”ã™ï¼ˆBinaryãƒ¢ãƒ¼ãƒ‰ï¼‰ ---
 Private Function ReadAllText(ByVal path As String) As String
     Dim ff As Integer
     Dim size As Long
@@ -264,10 +263,10 @@ Private Function GetBaseName(ByVal fileName As String) As String
     Dim p As Long: p = InStrRev(fileName, ".")
     If p > 0 Then GetBaseName = Left$(fileName, p - 1) Else GetBaseName = fileName
 End Function
-'=== Œ©o‚µ«‘i³‹K‰»–¼¨—ñ”Ô†j‚©‚ç—ñ”Ô†‚ğˆÀ‘S‚Éæ“¾ ===
+'=== è¦‹å‡ºã—è¾æ›¸ï¼ˆæ­£è¦åŒ–åâ†’åˆ—ç•ªå·ï¼‰ã‹ã‚‰åˆ—ç•ªå·ã‚’å®‰å…¨ã«å–å¾— ===
 Private Function MapGetCol(ByVal colMap As Object, ByVal key As String) As Long
     Dim k As String
-    k = NormalizeHeader(key)        ' •\‹L‚ä‚ê‚ğ‹zû
+    k = NormalizeHeader(key)        ' è¡¨è¨˜ã‚†ã‚Œã‚’å¸å
     If Not colMap Is Nothing Then
         If colMap.Exists(k) Then
             MapGetCol = colMap(k)
@@ -276,120 +275,120 @@ Private Function MapGetCol(ByVal colMap As Object, ByVal key As String) As Long
     End If
     MapGetCol = 0
 End Function
-Sub Œ‹‡CSVo—Í()
+Sub çµåˆCSVå‡ºåŠ›()
 
-    Dim ws•\ As Worksheet, wso—Í As Worksheet
+    Dim wsè¡¨ As Worksheet, wså‡ºåŠ› As Worksheet
     Dim lastRow As Long, row As Long, outRow As Long
     Dim headerRow As Long: headerRow = 3
     Dim colMap As Object: Set colMap = CreateObject("Scripting.Dictionary")
     Dim c As Long
 
-    ' === ƒV[ƒg€”õ ===
-    Set ws•\ = ThisWorkbook.Sheets("•\")
+    ' === ã‚·ãƒ¼ãƒˆæº–å‚™ ===
+    Set wsè¡¨ = ThisWorkbook.Sheets("è¡¨")
     On Error Resume Next
-    Set wso—Í = ThisWorkbook.Sheets("Œ‹‡CSV")
-    If wso—Í Is Nothing Then
-        Set wso—Í = ThisWorkbook.Sheets.Add(After:=ws•\)
-        wso—Í.name = "Œ‹‡CSV"
+    Set wså‡ºåŠ› = ThisWorkbook.Sheets("çµåˆCSV")
+    If wså‡ºåŠ› Is Nothing Then
+        Set wså‡ºåŠ› = ThisWorkbook.Sheets.Add(After:=wsè¡¨)
+        wså‡ºåŠ›.name = "çµåˆCSV"
     Else
-        wso—Í.Cells.ClearContents
+        wså‡ºåŠ›.Cells.ClearContents
     End If
     On Error GoTo 0
 
-    ' === Œ©o‚µ—ñ‚Ìƒ}ƒbƒsƒ“ƒOi³‹K‰»‚µ‚Ä“o˜^j ===
-    For c = 1 To ws•\.Cells(headerRow, ws•\.Columns.Count).End(xlToLeft).Column
-        Dim h As String: h = NormalizeHeader(ws•\.Cells(headerRow, c).value)
+    ' === è¦‹å‡ºã—åˆ—ã®ãƒãƒƒãƒ”ãƒ³ã‚°ï¼ˆæ­£è¦åŒ–ã—ã¦ç™»éŒ²ï¼‰ ===
+    For c = 1 To wsè¡¨.Cells(headerRow, wsè¡¨.Columns.Count).End(xlToLeft).Column
+        Dim h As String: h = NormalizeHeader(wsè¡¨.Cells(headerRow, c).value)
         If h <> "" Then colMap(h) = c
     Next
 
-    ' === •K{—ñ‚Ìæ“¾i³‹K‰»–¼‚ÅQÆj ===
-    Dim flagCol As Long:       flagCol = MapGetCol(colMap, "Œ‹‡CSV")
-    Dim Œ–¼Col As Long:        Œ–¼Col = MapGetCol(colMap, "Œ–¼")
-    Dim ‹ÆÒCol As Long:        ‹ÆÒCol = MapGetCol(colMap, "{H‹ÆÒEÂŒ Ò")
-    Dim Œ_–ñ“úCol As Long:      Œ_–ñ“úCol = MapGetCol(colMap, "Œ_–ñ”NŒ“ú")
-    Dim ‹àŠzCol As Long:        ‹àŠzCol = MapGetCol(colMap, "ÅIÂ–±•‰’SŠzi‡Œvj")
-    Dim i’»Col As Long:        i’»Col = MapGetCol(colMap, "i’»ó‹µ")
-    Dim ƒpƒbƒP[ƒWCol As Long:  ƒpƒbƒP[ƒWCol = MapGetCol(colMap, "•â•‹àƒpƒbƒP[ƒW")
+    ' === å¿…é ˆåˆ—ã®å–å¾—ï¼ˆæ­£è¦åŒ–åã§å‚ç…§ï¼‰ ===
+    Dim flagCol As Long:       flagCol = MapGetCol(colMap, "çµåˆCSV")
+    Dim ä»¶åCol As Long:        ä»¶åCol = MapGetCol(colMap, "ä»¶å")
+    Dim æ¥­è€…Col As Long:        æ¥­è€…Col = MapGetCol(colMap, "æ–½å·¥æ¥­è€…ãƒ»å‚µæ¨©è€…")
+    Dim å¥‘ç´„æ—¥Col As Long:      å¥‘ç´„æ—¥Col = MapGetCol(colMap, "å¥‘ç´„å¹´æœˆæ—¥")
+    Dim é‡‘é¡Col As Long:        é‡‘é¡Col = MapGetCol(colMap, "æœ€çµ‚å‚µå‹™è² æ‹…é¡ï¼ˆåˆè¨ˆï¼‰")
+    Dim é€²æ—Col As Long:        é€²æ—Col = MapGetCol(colMap, "é€²æ—çŠ¶æ³")
+    Dim ãƒ‘ãƒƒã‚±ãƒ¼ã‚¸Col As Long:  ãƒ‘ãƒƒã‚±ãƒ¼ã‚¸Col = MapGetCol(colMap, "è£œåŠ©é‡‘ãƒ‘ãƒƒã‚±ãƒ¼ã‚¸")
 
-    ' === •K{Œ©o‚µ‚Ì‘¶İƒ`ƒFƒbƒN ===
+    ' === å¿…é ˆè¦‹å‡ºã—ã®å­˜åœ¨ãƒã‚§ãƒƒã‚¯ ===
     Dim miss As String
-    If flagCol = 0 Then miss = miss & "EŒ‹‡CSV" & vbCrLf
-    If Œ–¼Col = 0 Then miss = miss & "EŒ–¼" & vbCrLf
-    If ‹ÆÒCol = 0 Then miss = miss & "E{H‹ÆÒEÂŒ Ò" & vbCrLf
-    If Œ_–ñ“úCol = 0 Then miss = miss & "EŒ_–ñ”NŒ“ú" & vbCrLf
-    If ‹àŠzCol = 0 Then miss = miss & "EÅIÂ–±•‰’SŠzi‡Œvj" & vbCrLf
-    If i’»Col = 0 Then miss = miss & "Ei’»ó‹µ" & vbCrLf
-    If ƒpƒbƒP[ƒWCol = 0 Then miss = miss & "E•â•‹àƒpƒbƒP[ƒW" & vbCrLf
+    If flagCol = 0 Then miss = miss & "ãƒ»çµåˆCSV" & vbCrLf
+    If ä»¶åCol = 0 Then miss = miss & "ãƒ»ä»¶å" & vbCrLf
+    If æ¥­è€…Col = 0 Then miss = miss & "ãƒ»æ–½å·¥æ¥­è€…ãƒ»å‚µæ¨©è€…" & vbCrLf
+    If å¥‘ç´„æ—¥Col = 0 Then miss = miss & "ãƒ»å¥‘ç´„å¹´æœˆæ—¥" & vbCrLf
+    If é‡‘é¡Col = 0 Then miss = miss & "ãƒ»æœ€çµ‚å‚µå‹™è² æ‹…é¡ï¼ˆåˆè¨ˆï¼‰" & vbCrLf
+    If é€²æ—Col = 0 Then miss = miss & "ãƒ»é€²æ—çŠ¶æ³" & vbCrLf
+    If ãƒ‘ãƒƒã‚±ãƒ¼ã‚¸Col = 0 Then miss = miss & "ãƒ»è£œåŠ©é‡‘ãƒ‘ãƒƒã‚±ãƒ¼ã‚¸" & vbCrLf
     If Len(miss) > 0 Then
-        MsgBox "Œ‹‡CSVo—Í‚É•K—v‚ÈŒ©o‚µ‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñB" & vbCrLf & vbCrLf & miss, vbExclamation
+        MsgBox "çµåˆCSVå‡ºåŠ›ã«å¿…è¦ãªè¦‹å‡ºã—ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã€‚" & vbCrLf & vbCrLf & miss, vbExclamation
         Exit Sub
     End If
 
-    ' === ‘åšE’n”Ô—ñ‚Ìæ“¾i‡@?‡IA–³‚¯‚ê‚Î0‚Ì‚Ü‚Üj ===
+    ' === å¤§å­—ãƒ»åœ°ç•ªåˆ—ã®å–å¾—ï¼ˆâ‘ ?â‘©ã€ç„¡ã‘ã‚Œã°0ã®ã¾ã¾ï¼‰ ===
     Dim i As Long, numMark As String
-    Dim ‘åš—ñ(1 To 10) As Long, Œ³’n”Ô—ñ(1 To 10) As Long, Œã’n”Ô—ñ(1 To 10) As Long
+    Dim å¤§å­—åˆ—(1 To 10) As Long, å…ƒåœ°ç•ªåˆ—(1 To 10) As Long, å¾Œåœ°ç•ªåˆ—(1 To 10) As Long
     For i = 1 To 10
-        numMark = ChrW(9311 + i) ' ‡@c‡I
-        ‘åš—ñ(i) = MapGetCol(colMap, "‘åš" & numMark)
-        Œ³’n”Ô—ñ(i) = MapGetCol(colMap, "Œ³’n”Ô" & numMark)
-        Œã’n”Ô—ñ(i) = MapGetCol(colMap, "Œã’n”Ô" & numMark)
+        numMark = ChrW(9311 + i) ' â‘ â€¦â‘©
+        å¤§å­—åˆ—(i) = MapGetCol(colMap, "å¤§å­—" & numMark)
+        å…ƒåœ°ç•ªåˆ—(i) = MapGetCol(colMap, "å…ƒåœ°ç•ª" & numMark)
+        å¾Œåœ°ç•ªåˆ—(i) = MapGetCol(colMap, "å¾Œåœ°ç•ª" & numMark)
     Next
 
-    ' === o—ÍƒV[ƒgŒ©o‚µİ’è ===
-    With wso—Í
-        .Cells(1, 1).value = "Œ–¼"
-        .Cells(1, 2).value = "‹ÆÒ–¼"
-        .Cells(1, 3).value = "ZŠ"
-        .Cells(1, 4).value = "Œ_–ñ”NŒ“ú"
-        .Cells(1, 5).value = "ÅIÂ–±•‰’SŠzi‡Œvj"
-        .Cells(1, 6).value = "i’»ó‹µ"
-        .Cells(1, 7).value = "•â•‹àƒpƒbƒP[ƒW"
-        .Cells(1, 8).value = "í•Ê"
+    ' === å‡ºåŠ›ã‚·ãƒ¼ãƒˆè¦‹å‡ºã—è¨­å®š ===
+    With wså‡ºåŠ›
+        .Cells(1, 1).value = "ä»¶å"
+        .Cells(1, 2).value = "æ¥­è€…å"
+        .Cells(1, 3).value = "ä½æ‰€"
+        .Cells(1, 4).value = "å¥‘ç´„å¹´æœˆæ—¥"
+        .Cells(1, 5).value = "æœ€çµ‚å‚µå‹™è² æ‹…é¡ï¼ˆåˆè¨ˆï¼‰"
+        .Cells(1, 6).value = "é€²æ—çŠ¶æ³"
+        .Cells(1, 7).value = "è£œåŠ©é‡‘ãƒ‘ãƒƒã‚±ãƒ¼ã‚¸"
+        .Cells(1, 8).value = "ç¨®åˆ¥"
     End With
 
-    ' === ƒf[ƒ^o—Í ===
+    ' === ãƒ‡ãƒ¼ã‚¿å‡ºåŠ› ===
     outRow = 2
-    lastRow = ws•\.Cells(ws•\.Rows.Count, 1).End(xlUp).row
+    lastRow = wsè¡¨.Cells(wsè¡¨.Rows.Count, 1).End(xlUp).row
 
     For row = headerRow + 1 To lastRow
-        If ws•\.Cells(row, flagCol).value = "Z" Then
+        If wsè¡¨.Cells(row, flagCol).value = "ã€‡" Then
             For i = 1 To 10
-                Dim ‘åš As String, ’n”Ô As String
+                Dim å¤§å­— As String, åœ°ç•ª As String
 
-                ' --- ‘åši—ñ‚ª–³‚¯‚ê‚Î‹ój ---
-                If ‘åš—ñ(i) > 0 Then ‘åš = Trim$(ws•\.Cells(row, ‘åš—ñ(i)).value) Else ‘åš = ""
+                ' --- å¤§å­—ï¼ˆåˆ—ãŒç„¡ã‘ã‚Œã°ç©ºï¼‰ ---
+                If å¤§å­—åˆ—(i) > 0 Then å¤§å­— = Trim$(wsè¡¨.Cells(row, å¤§å­—åˆ—(i)).value) Else å¤§å­— = ""
 
-                ' --- Œ³’n”Ô ---
-                If Œ³’n”Ô—ñ(i) > 0 Then
-                    ’n”Ô = Trim$(ws•\.Cells(row, Œ³’n”Ô—ñ(i)).value)
-                    If ’n”Ô <> "" Then
-                        With wso—Í
-                            .Cells(outRow, 1).value = ws•\.Cells(row, Œ–¼Col).value
-                            .Cells(outRow, 2).value = ws•\.Cells(row, ‹ÆÒCol).value
-                            .Cells(outRow, 3).value = ‘åš & ’n”Ô
-                            .Cells(outRow, 4).value = ws•\.Cells(row, Œ_–ñ“úCol).value
-                            .Cells(outRow, 5).value = ws•\.Cells(row, ‹àŠzCol).value
-                            .Cells(outRow, 6).value = ws•\.Cells(row, i’»Col).value
-                            .Cells(outRow, 7).value = ws•\.Cells(row, ƒpƒbƒP[ƒWCol).value
-                            .Cells(outRow, 8).value = "”ƒû—\’è’n"
+                ' --- å…ƒåœ°ç•ª ---
+                If å…ƒåœ°ç•ªåˆ—(i) > 0 Then
+                    åœ°ç•ª = Trim$(wsè¡¨.Cells(row, å…ƒåœ°ç•ªåˆ—(i)).value)
+                    If åœ°ç•ª <> "" Then
+                        With wså‡ºåŠ›
+                            .Cells(outRow, 1).value = wsè¡¨.Cells(row, ä»¶åCol).value
+                            .Cells(outRow, 2).value = wsè¡¨.Cells(row, æ¥­è€…Col).value
+                            .Cells(outRow, 3).value = å¤§å­— & åœ°ç•ª
+                            .Cells(outRow, 4).value = wsè¡¨.Cells(row, å¥‘ç´„æ—¥Col).value
+                            .Cells(outRow, 5).value = wsè¡¨.Cells(row, é‡‘é¡Col).value
+                            .Cells(outRow, 6).value = wsè¡¨.Cells(row, é€²æ—Col).value
+                            .Cells(outRow, 7).value = wsè¡¨.Cells(row, ãƒ‘ãƒƒã‚±ãƒ¼ã‚¸Col).value
+                            .Cells(outRow, 8).value = "è²·åäºˆå®šåœ°"
                         End With
                         outRow = outRow + 1
                     End If
                 End If
 
-                ' --- Œã’n”Ô ---
-                If Œã’n”Ô—ñ(i) > 0 Then
-                    ’n”Ô = Trim$(ws•\.Cells(row, Œã’n”Ô—ñ(i)).value)
-                    If ’n”Ô <> "" Then
-                        With wso—Í
-                            .Cells(outRow, 1).value = ws•\.Cells(row, Œ–¼Col).value
-                            .Cells(outRow, 2).value = ws•\.Cells(row, ‹ÆÒCol).value
-                            .Cells(outRow, 3).value = ‘åš & ’n”Ô
-                            .Cells(outRow, 4).value = ws•\.Cells(row, Œ_–ñ“úCol).value
-                            .Cells(outRow, 5).value = ws•\.Cells(row, ‹àŠzCol).value
-                            .Cells(outRow, 6).value = ws•\.Cells(row, i’»Col).value
-                            .Cells(outRow, 7).value = ws•\.Cells(row, ƒpƒbƒP[ƒWCol).value
-                            .Cells(outRow, 8).value = "ÀÛ‚É”ƒû"
+                ' --- å¾Œåœ°ç•ª ---
+                If å¾Œåœ°ç•ªåˆ—(i) > 0 Then
+                    åœ°ç•ª = Trim$(wsè¡¨.Cells(row, å¾Œåœ°ç•ªåˆ—(i)).value)
+                    If åœ°ç•ª <> "" Then
+                        With wså‡ºåŠ›
+                            .Cells(outRow, 1).value = wsè¡¨.Cells(row, ä»¶åCol).value
+                            .Cells(outRow, 2).value = wsè¡¨.Cells(row, æ¥­è€…Col).value
+                            .Cells(outRow, 3).value = å¤§å­— & åœ°ç•ª
+                            .Cells(outRow, 4).value = wsè¡¨.Cells(row, å¥‘ç´„æ—¥Col).value
+                            .Cells(outRow, 5).value = wsè¡¨.Cells(row, é‡‘é¡Col).value
+                            .Cells(outRow, 6).value = wsè¡¨.Cells(row, é€²æ—Col).value
+                            .Cells(outRow, 7).value = wsè¡¨.Cells(row, ãƒ‘ãƒƒã‚±ãƒ¼ã‚¸Col).value
+                            .Cells(outRow, 8).value = "å®Ÿéš›ã«è²·å"
                         End With
                         outRow = outRow + 1
                     End If
@@ -398,16 +397,16 @@ Sub Œ‹‡CSVo—Í()
         End If
     Next row
 
-    ' === o—Í‘ÎÛƒ`ƒFƒbƒN ===
+    ' === å‡ºåŠ›å¯¾è±¡ãƒã‚§ãƒƒã‚¯ ===
     If outRow = 2 Then
-        MsgBox "o—Í‘ÎÛ‚Ìƒf[ƒ^‚ª‚ ‚è‚Ü‚¹‚ñB", vbExclamation
+        MsgBox "å‡ºåŠ›å¯¾è±¡ã®ãƒ‡ãƒ¼ã‚¿ãŒã‚ã‚Šã¾ã›ã‚“ã€‚", vbExclamation
         Exit Sub
     End If
 
-    ' === CSVƒtƒ@ƒCƒ‹o—ÍiŒÅ’è–¼{•t‚«ƒXƒiƒbƒvƒVƒ‡ƒbƒgj ===
+    ' === CSVãƒ•ã‚¡ã‚¤ãƒ«å‡ºåŠ›ï¼ˆå›ºå®šåï¼‹æ™‚åˆ»ä»˜ãã‚¹ãƒŠãƒƒãƒ—ã‚·ãƒ§ãƒƒãƒˆï¼‰ ===
     Dim timeStamp As String: timeStamp = Format(Now, "yyyymmdd_HHmm")
-    Dim latestPath As String: latestPath = CSV_LATEST                           ' šŒÅ’è–¼
-    Dim snapPath  As String: snapPath = OUT_DIR & "csv\Œ‹‡CSV_" & timeStamp & ".csv"   ' šƒXƒiƒbƒvƒVƒ‡ƒbƒg
+    Dim latestPath As String: latestPath = CSV_LATEST                           ' â˜…å›ºå®šå
+    Dim snapPath  As String: snapPath = OUT_DIR & "csv\çµåˆCSV_" & timeStamp & ".csv"   ' â˜…ã‚¹ãƒŠãƒƒãƒ—ã‚·ãƒ§ãƒƒãƒˆ
 
     Mk OUT_DIR
     Mk OUT_DIR & "csv\"
@@ -415,42 +414,42 @@ Sub Œ‹‡CSVo—Í()
     Dim exportBook As Workbook: Set exportBook = Workbooks.Add
     Dim exportSheet As Worksheet: Set exportSheet = exportBook.Sheets(1)
 
-    wso—Í.UsedRange.Copy Destination:=exportSheet.Range("A1")
+    wså‡ºåŠ›.UsedRange.Copy Destination:=exportSheet.Range("A1")
 
-    '=== CSV•Û‘¶Fˆê’UTEMP‚É•Û‘¶¨’uŠ·ƒRƒs[iƒƒbƒN‘Îôj ===
-    Dim tempPath As String: tempPath = Environ$("TEMP") & "\Œ‹‡CSV_tmp_" & timeStamp & ".csv"
+    '=== CSVä¿å­˜ï¼šä¸€æ—¦TEMPã«ä¿å­˜â†’ç½®æ›ã‚³ãƒ”ãƒ¼ï¼ˆãƒ­ãƒƒã‚¯å¯¾ç­–ï¼‰ ===
+    Dim tempPath As String: tempPath = Environ$("TEMP") & "\çµåˆCSV_tmp_" & timeStamp & ".csv"
 
     Application.DisplayAlerts = False
     exportBook.SaveAs fileName:=tempPath, FileFormat:=xlCSVUTF8, Local:=True
     exportBook.Close SaveChanges:=False
     Application.DisplayAlerts = True
 
-    ' ”CˆÓFˆêƒtƒ@ƒCƒ‹‚ª–³‚¯‚ê‚Î‚±‚±‚Å’†’f
+    ' ä»»æ„ï¼šä¸€æ™‚ãƒ•ã‚¡ã‚¤ãƒ«ãŒç„¡ã‘ã‚Œã°ã“ã“ã§ä¸­æ–­
     If Len(Dir$(tempPath)) = 0 Then
-        MsgBox "ˆêCSV‚Ìì¬‚É¸”s‚µ‚Ü‚µ‚½: " & tempPath, vbExclamation
+        MsgBox "ä¸€æ™‚CSVã®ä½œæˆã«å¤±æ•—ã—ã¾ã—ãŸ: " & tempPath, vbExclamation
         Exit Sub
     End If
 
 
-    ' Šù‘¶‚ÌŒÅ’èCSV‚ğíœ‚µ‚Ä‚©‚ç·‚µ‘Ö‚¦
+    ' æ—¢å­˜ã®å›ºå®šCSVã‚’å‰Šé™¤ã—ã¦ã‹ã‚‰å·®ã—æ›¿ãˆ
     On Error Resume Next
-    Kill latestPath                      ' C:\c\VBAo—ÍæƒtƒHƒ‹ƒ_\csv\Œ‹‡CSV_latest.csv
+    Kill latestPath                      ' C:\â€¦\VBAå‡ºåŠ›å…ˆãƒ•ã‚©ãƒ«ãƒ€\csv\çµåˆCSV_latest.csv
     On Error GoTo 0
-    FileCopy tempPath, latestPath        ' ŒÅ’èƒtƒ@ƒCƒ‹‚É·‚µ‘Ö‚¦
-    FileCopy tempPath, snapPath          ' ƒXƒiƒbƒvƒVƒ‡ƒbƒg‚à•Û‘¶
+    FileCopy tempPath, latestPath        ' å›ºå®šãƒ•ã‚¡ã‚¤ãƒ«ã«å·®ã—æ›¿ãˆ
+    FileCopy tempPath, snapPath          ' ã‚¹ãƒŠãƒƒãƒ—ã‚·ãƒ§ãƒƒãƒˆã‚‚ä¿å­˜
     On Error Resume Next: Kill tempPath: On Error GoTo 0
 
 
-    MsgBox "CSVo—ÍŠ®—¹F" & vbCrLf & _
-           "ŒÅ’è: " & latestPath & vbCrLf & _
-           "ƒXƒiƒbƒvƒVƒ‡ƒbƒg: " & snapPath, vbInformation
+    MsgBox "CSVå‡ºåŠ›å®Œäº†ï¼š" & vbCrLf & _
+           "å›ºå®š: " & latestPath & vbCrLf & _
+           "ã‚¹ãƒŠãƒƒãƒ—ã‚·ãƒ§ãƒƒãƒˆ: " & snapPath, vbInformation
 
 End Sub
 
 
 
 
-Sub ‰È–Ú•Ê–‹Æ•ÊÎoˆê——•ÒW()
+Sub ç§‘ç›®åˆ¥äº‹æ¥­åˆ¥æ­³å‡ºä¸€è¦§ç·¨é›†()
 
     Dim wsSrc As Worksheet, wsDest As Worksheet
     Dim lastRow As Long, lastCol As Long
@@ -461,31 +460,31 @@ Sub ‰È–Ú•Ê–‹Æ•ÊÎoˆê——•ÒW()
     Dim destRow As Long
     Dim isKurikoshi As Boolean
 
-    Set wsSrc = ThisWorkbook.Sheets("—\ZiƒRƒsƒyj")
-    Set wsDest = ThisWorkbook.Sheets("—\Ziƒ\[ƒgŒãj")
+    Set wsSrc = ThisWorkbook.Sheets("äºˆç®—ï¼ˆã‚³ãƒ”ãƒšï¼‰")
+    Set wsDest = ThisWorkbook.Sheets("äºˆç®—ï¼ˆã‚½ãƒ¼ãƒˆå¾Œï¼‰")
 
-    ' “]ÊæƒNƒŠƒAi1`2s–Ú‚Í•Ûj
+    ' è»¢å†™å…ˆã‚¯ãƒªã‚¢ï¼ˆ1ï½2è¡Œç›®ã¯ä¿æŒï¼‰
     wsDest.Rows("3:" & wsDest.Rows.Count).ClearContents
     wsDest.Cells.EntireColumn.Hidden = False
 
-    ' ÅIs‚Æ—ñ
+    ' æœ€çµ‚è¡Œã¨åˆ—
     lastRow = wsSrc.Cells(wsSrc.Rows.Count, 1).End(xlUp).row
     lastCol = wsSrc.Cells(2, wsSrc.Columns.Count).End(xlToLeft).Column
 
-    ' ƒf[ƒ^“]Êi3s–ÚˆÈ~ ¨ 3s–ÚˆÈ~j
+    ' ãƒ‡ãƒ¼ã‚¿è»¢å†™ï¼ˆ3è¡Œç›®ä»¥é™ â†’ 3è¡Œç›®ä»¥é™ï¼‰
     For r = 3 To lastRow
         destRow = r
         yearStr = ""
         majorName = ""
         detailName = ""
 
-        ' C—ñ‚ªuŒJ‰z–¾‹–v‚Ì‚Æ‚«”N“x‚ğ -1
-        isKurikoshi = (wsSrc.Cells(r, 3).value = "ŒJ‰z–¾‹–")
+        ' Cåˆ—ãŒã€Œç¹°è¶Šæ˜è¨±ã€ã®ã¨ãå¹´åº¦ã‚’ -1
+        isKurikoshi = (wsSrc.Cells(r, 3).value = "ç¹°è¶Šæ˜è¨±")
 
         For c = 1 To lastCol
             value = wsSrc.Cells(r, c).value
 
-            ' A—ñF”N“x•â³{Œ³†•ÏŠ·
+            ' Aåˆ—ï¼šå¹´åº¦è£œæ­£ï¼‹å…ƒå·å¤‰æ›
             If c = 1 Then
                 If IsNumeric(value) Then
                     yearNum = CInt(value)
@@ -499,22 +498,22 @@ Sub ‰È–Ú•Ê–‹Æ•ÊÎoˆê——•ÒW()
                         value = "S" & (yearNum - 1925)
                     End If
                 End If
-                yearStr = value ' ©•ÏŠ·Œã‚ğ‹L˜^
+                yearStr = value ' â†å¤‰æ›å¾Œã‚’è¨˜éŒ²
             End If
 
-            ' ‡‘Ì‘ÎÛ—ñ•Û‘¶i25=Y—ñ:‘å–‹ÆA30=AD—ñ:×Xßj
+            ' åˆä½“å¯¾è±¡åˆ—ä¿å­˜ï¼ˆ25=Yåˆ—:å¤§äº‹æ¥­ã€30=ADåˆ—:ç´°ã€…ç¯€ï¼‰
             If c = 25 Then majorName = value
             If c = 30 Then detailName = value
 
-            ' “]Êi1—ñ‰E‚¸‚ç‚µB—ñˆÈ~j
+            ' è»¢å†™ï¼ˆ1åˆ—å³ãšã‚‰ã—ï¼Båˆ—ä»¥é™ï¼‰
             wsDest.Cells(destRow, c + 1).value = value
         Next c
 
-        ' A—ñ‚ÉŒ‹‡ƒL[i‹ó”’‚È‚µj
+        ' Aåˆ—ã«çµåˆã‚­ãƒ¼ï¼ˆç©ºç™½ãªã—ï¼‰
         wsDest.Cells(destRow, 1).value = yearStr & majorName & detailName
     Next r
 
-    ' ”ñ•\¦‚É‚·‚é—ñiŒ³‚Ì—ñ”Ô†‚É+1‚µ‚ÄB—ñˆÈ~‚É“K—pj
+    ' éè¡¨ç¤ºã«ã™ã‚‹åˆ—ï¼ˆå…ƒã®åˆ—ç•ªå·ã«+1ã—ã¦Båˆ—ä»¥é™ã«é©ç”¨ï¼‰
     Dim hideCols As Variant
     hideCols = Array(2, 4, 5, 6, 7, 8, _
                      10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, _
@@ -525,32 +524,32 @@ Sub ‰È–Ú•Ê–‹Æ•ÊÎoˆê——•ÒW()
         wsDest.Columns(i + 1).Hidden = True
     Next i
 
-    MsgBox "ŒJ‰z–¾‹–‘Î‰‚Ì“]Ê‚ªŠ®—¹‚µ‚Ü‚µ‚½B", vbInformation
+    MsgBox "ç¹°è¶Šæ˜è¨±å¯¾å¿œã®è»¢å†™ãŒå®Œäº†ã—ã¾ã—ãŸã€‚", vbInformation
 
 End Sub
 
 
 
-Sub —\ZŠz‚ğ•\‚É“]Ê()
+Sub äºˆç®—é¡ã‚’è¡¨ã«è»¢å†™()
 
-    Dim ws•\ As Worksheet, ws—\Z As Worksheet
-    Dim dict—\Z As Object
+    Dim wsè¡¨ As Worksheet, wsäºˆç®— As Worksheet
+    Dim dictäºˆç®— As Object
     Dim r As Long
-    Dim lastRow•\ As Long, lastRow—\Z As Long
+    Dim lastRowè¡¨ As Long, lastRowäºˆç®— As Long
     Dim keyEM As String, keyEQ As String
     Dim yearNum As Long, yearStr As String
-    Dim col”N“x As Long, col–‹Æ As Long, col×Xß As Long, col×XßŒJ‰z As Long
-    Dim colEQ_—\ZŠz As Long, colEU_—\ZŠz3 As Long
+    Dim colå¹´åº¦ As Long, coläº‹æ¥­ As Long, colç´°ã€…ç¯€ As Long, colç´°ã€…ç¯€ç¹°è¶Š As Long
+    Dim colEQ_äºˆç®—é¡ As Long, colEU_äºˆç®—é¡3 As Long
     Dim calcMode As XlCalculation
-    Const RESPECT_BOLD As Boolean = True  ' © ‘¾š‚ğ•ÛŒì‚µ‚½‚¢‚È‚ç True ‚É
+    Const RESPECT_BOLD As Boolean = True  ' â† å¤ªå­—ã‚’ä¿è­·ã—ãŸã„ãªã‚‰ True ã«
 
     On Error GoTo ErrHandler
 
-    Set ws•\ = ThisWorkbook.Sheets("•\")
-    Set ws—\Z = ThisWorkbook.Sheets("—\Ziƒ\[ƒgŒãj")
-    Set dict—\Z = CreateObject("Scripting.Dictionary")
+    Set wsè¡¨ = ThisWorkbook.Sheets("è¡¨")
+    Set wsäºˆç®— = ThisWorkbook.Sheets("äºˆç®—ï¼ˆã‚½ãƒ¼ãƒˆå¾Œï¼‰")
+    Set dictäºˆç®— = CreateObject("Scripting.Dictionary")
 
-    '=== ‚‘¬‰» ===
+    '=== é«˜é€ŸåŒ– ===
     With Application
         .ScreenUpdating = False
         .EnableEvents = False
@@ -558,52 +557,52 @@ Sub —\ZŠz‚ğ•\‚É“]Ê()
         .Calculation = xlCalculationManual
     End With
 
-    ' === Œ©o‚µis3j‚ğæ“¾ ===
-    col”N“x = GetColByHeaderAny(ws•\, 3, Array("”N“x"))
-    col–‹Æ = GetColByHeaderAny(ws•\, 3, Array("‘å–‹Æ"))
-    col×Xß = GetColByHeaderAny(ws•\, 3, Array("×Xß"))
-    col×XßŒJ‰z = GetColByHeaderAny(ws•\, 3, Array("×XßkŒJ‰z–¾‹–•ªl", "×Xß[ŒJ‰z–¾‹–•ª]"))
-    If col”N“x * col–‹Æ * col×Xß * col×XßŒJ‰z = 0 Then
-        Err.Raise vbObjectError + 1, , "•K—v‚ÈŒ©o‚µi”N“x/‘å–‹Æ/×Xßcj‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñB"
+    ' === è¦‹å‡ºã—ï¼ˆè¡Œ3ï¼‰ã‚’å–å¾— ===
+    colå¹´åº¦ = GetColByHeaderAny(wsè¡¨, 3, Array("å¹´åº¦"))
+    coläº‹æ¥­ = GetColByHeaderAny(wsè¡¨, 3, Array("å¤§äº‹æ¥­"))
+    colç´°ã€…ç¯€ = GetColByHeaderAny(wsè¡¨, 3, Array("ç´°ã€…ç¯€"))
+    colç´°ã€…ç¯€ç¹°è¶Š = GetColByHeaderAny(wsè¡¨, 3, Array("ç´°ã€…ç¯€ã€”ç¹°è¶Šæ˜è¨±åˆ†ã€•", "ç´°ã€…ç¯€[ç¹°è¶Šæ˜è¨±åˆ†]"))
+    If colå¹´åº¦ * coläº‹æ¥­ * colç´°ã€…ç¯€ * colç´°ã€…ç¯€ç¹°è¶Š = 0 Then
+        Err.Raise vbObjectError + 1, , "å¿…è¦ãªè¦‹å‡ºã—ï¼ˆå¹´åº¦/å¤§äº‹æ¥­/ç´°ã€…ç¯€â€¦ï¼‰ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã€‚"
     End If
 
-    ' === “]‹Læ‚ğg‰E’[ˆê’vh‚Åæ“¾i«—ˆ‚Ì—ñ‘‚É‘Î‰j ===
-    colEQ_—\ZŠz = FindLastColByHeaderAny(ws•\, 3, Array("—\ZŠz", "—\ZŠziç‰~j", "—\ZŠz(ç‰~)"))
-    colEU_—\ZŠz3 = FindLastColByHeaderAny(ws•\, 3, Array("—\ZŠz3", "—\ZŠz‚R", "—\ZŠz 3"))
-    If colEQ_—\ZŠz = 0 Then Err.Raise vbObjectError + 2, , "Œ©o‚µw—\ZŠzx‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñB"
-    If colEU_—\ZŠz3 = 0 Then Err.Raise vbObjectError + 3, , "Œ©o‚µw—\ZŠz3x‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñB"
+    ' === è»¢è¨˜å…ˆã‚’â€œå³ç«¯ä¸€è‡´â€ã§å–å¾—ï¼ˆå°†æ¥ã®åˆ—å¢—ã«å¯¾å¿œï¼‰ ===
+    colEQ_äºˆç®—é¡ = FindLastColByHeaderAny(wsè¡¨, 3, Array("äºˆç®—é¡", "äºˆç®—é¡ï¼ˆåƒå††ï¼‰", "äºˆç®—é¡(åƒå††)"))
+    colEU_äºˆç®—é¡3 = FindLastColByHeaderAny(wsè¡¨, 3, Array("äºˆç®—é¡3", "äºˆç®—é¡ï¼“", "äºˆç®—é¡ 3"))
+    If colEQ_äºˆç®—é¡ = 0 Then Err.Raise vbObjectError + 2, , "è¦‹å‡ºã—ã€äºˆç®—é¡ã€ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã€‚"
+    If colEU_äºˆç®—é¡3 = 0 Then Err.Raise vbObjectError + 3, , "è¦‹å‡ºã—ã€äºˆç®—é¡3ã€ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã€‚"
 
-    ' === —\Ziƒ\[ƒgŒãjFA—ñƒL[¨AF—ñ(32)‹àŠz‚ğ«‘‚ÉiƒL[‚Í³‹K‰»‚µ‚Ä“o˜^j===
-    lastRow—\Z = ws—\Z.Cells(ws—\Z.Rows.Count, 1).End(xlUp).row
-    For r = 3 To lastRow—\Z
+    ' === äºˆç®—ï¼ˆã‚½ãƒ¼ãƒˆå¾Œï¼‰ï¼šAåˆ—ã‚­ãƒ¼â†’AFåˆ—(32)é‡‘é¡ã‚’è¾æ›¸ã«ï¼ˆã‚­ãƒ¼ã¯æ­£è¦åŒ–ã—ã¦ç™»éŒ²ï¼‰===
+    lastRowäºˆç®— = wsäºˆç®—.Cells(wsäºˆç®—.Rows.Count, 1).End(xlUp).row
+    For r = 3 To lastRowäºˆç®—
         Dim k As String
-        k = NmlKey(ws—\Z.Cells(r, 1).value)  ' R07/H01 “™¨R7/H1A•s‰Â‹•¶š‚àœ‹
-        If k <> "" Then dict—\Z(k) = ws—\Z.Cells(r, 32).value
+        k = NmlKey(wsäºˆç®—.Cells(r, 1).value)  ' R07/H01 ç­‰â†’R7/H1ã€ä¸å¯è¦–æ–‡å­—ã‚‚é™¤å»
+        If k <> "" Then dictäºˆç®—(k) = wsäºˆç®—.Cells(r, 32).value
     Next r
 
-    ' === ÅIsFƒL[—ñ‚ÌÅ‘å‚Åæ“¾iA—ñˆË‘¶‚ğ‚â‚ß‚éj===
+    ' === æœ€çµ‚è¡Œï¼šã‚­ãƒ¼åˆ—ã®æœ€å¤§ã§å–å¾—ï¼ˆAåˆ—ä¾å­˜ã‚’ã‚„ã‚ã‚‹ï¼‰===
     Dim lastRowA As Long, lastRowN As Long, lastRowJ As Long, lastRowS As Long, lastRowK As Long
-    lastRowA = ws•\.Cells(ws•\.Rows.Count, 1).End(xlUp).row
-    lastRowN = ws•\.Cells(ws•\.Rows.Count, col”N“x).End(xlUp).row
-    lastRowJ = ws•\.Cells(ws•\.Rows.Count, col–‹Æ).End(xlUp).row
-    lastRowS = ws•\.Cells(ws•\.Rows.Count, col×Xß).End(xlUp).row
-    lastRowK = ws•\.Cells(ws•\.Rows.Count, col×XßŒJ‰z).End(xlUp).row
-    lastRow•\ = Application.WorksheetFunction.Max(lastRowA, lastRowN, lastRowJ, lastRowS, lastRowK)
+    lastRowA = wsè¡¨.Cells(wsè¡¨.Rows.Count, 1).End(xlUp).row
+    lastRowN = wsè¡¨.Cells(wsè¡¨.Rows.Count, colå¹´åº¦).End(xlUp).row
+    lastRowJ = wsè¡¨.Cells(wsè¡¨.Rows.Count, coläº‹æ¥­).End(xlUp).row
+    lastRowS = wsè¡¨.Cells(wsè¡¨.Rows.Count, colç´°ã€…ç¯€).End(xlUp).row
+    lastRowK = wsè¡¨.Cells(wsè¡¨.Rows.Count, colç´°ã€…ç¯€ç¹°è¶Š).End(xlUp).row
+    lastRowè¡¨ = Application.WorksheetFunction.Max(lastRowA, lastRowN, lastRowJ, lastRowS, lastRowK)
 
-    ' === •\ƒV[ƒg‚Ö“]‹L ===
-    For r = 4 To lastRow•\
+    ' === è¡¨ã‚·ãƒ¼ãƒˆã¸è»¢è¨˜ ===
+    For r = 4 To lastRowè¡¨
 
-        ' Š®‘S‹ós‚ÍƒXƒLƒbƒv
-        If Nml(ws•\.Cells(r, col”N“x).value) = "" _
-           And Nml(ws•\.Cells(r, col–‹Æ).value) = "" _
-           And Nml(ws•\.Cells(r, col×Xß).value) = "" _
-           And Nml(ws•\.Cells(r, col×XßŒJ‰z).value) = "" Then
+        ' å®Œå…¨ç©ºè¡Œã¯ã‚¹ã‚­ãƒƒãƒ—
+        If Nml(wsè¡¨.Cells(r, colå¹´åº¦).value) = "" _
+           And Nml(wsè¡¨.Cells(r, coläº‹æ¥­).value) = "" _
+           And Nml(wsè¡¨.Cells(r, colç´°ã€…ç¯€).value) = "" _
+           And Nml(wsè¡¨.Cells(r, colç´°ã€…ç¯€ç¹°è¶Š).value) = "" Then
             GoTo NextR
         End If
 
-        ' ”N“x¨˜a—ïi& ˜a—ï•\‹L‚Ì³‹K‰»j
+        ' å¹´åº¦â†’å’Œæš¦ï¼ˆ& å’Œæš¦è¡¨è¨˜ã®æ­£è¦åŒ–ï¼‰
         Dim vNendo As Variant
-        vNendo = ws•\.Cells(r, col”N“x).value
+        vNendo = wsè¡¨.Cells(r, colå¹´åº¦).value
         If Not IsError(vNendo) And Not IsEmpty(vNendo) And IsNumeric(vNendo) Then
             yearNum = CLng(vNendo)
             If yearNum >= 2019 Then
@@ -620,24 +619,24 @@ Sub —\ZŠz‚ğ•\‚É“]Ê()
         End If
         yearStr = NmlWareki(yearStr)
 
-        ' EQ(—\ZŠz)F”N“x + ‘å–‹Æ + ×Xß
-        If Nml(ws•\.Cells(r, col–‹Æ).value) <> "" And Nml(ws•\.Cells(r, col×Xß).value) <> "" Then
-            keyEM = MakeKey(yearStr, ws•\.Cells(r, col–‹Æ).value, ws•\.Cells(r, col×Xß).value)
-            With ws•\.Cells(r, colEQ_—\ZŠz)
-                If dict—\Z.Exists(keyEM) Then
-                    If Not (RESPECT_BOLD And IsNumeric(.value) And .Font.Bold) Then .value = dict—\Z(keyEM)
+        ' EQ(äºˆç®—é¡)ï¼šå¹´åº¦ + å¤§äº‹æ¥­ + ç´°ã€…ç¯€
+        If Nml(wsè¡¨.Cells(r, coläº‹æ¥­).value) <> "" And Nml(wsè¡¨.Cells(r, colç´°ã€…ç¯€).value) <> "" Then
+            keyEM = MakeKey(yearStr, wsè¡¨.Cells(r, coläº‹æ¥­).value, wsè¡¨.Cells(r, colç´°ã€…ç¯€).value)
+            With wsè¡¨.Cells(r, colEQ_äºˆç®—é¡)
+                If dictäºˆç®—.Exists(keyEM) Then
+                    If Not (RESPECT_BOLD And IsNumeric(.value) And .Font.Bold) Then .value = dictäºˆç®—(keyEM)
                 Else
                     If Not (RESPECT_BOLD And IsNumeric(.value) And .Font.Bold) Then .ClearContents
                 End If
             End With
         End If
 
-        ' EU(—\ZŠz3)F”N“x + ‘å–‹Æ + ×XßkŒJ‰z–¾‹–•ªl
-        If Nml(ws•\.Cells(r, col–‹Æ).value) <> "" And Nml(ws•\.Cells(r, col×XßŒJ‰z).value) <> "" Then
-            keyEQ = MakeKey(yearStr, ws•\.Cells(r, col–‹Æ).value, ws•\.Cells(r, col×XßŒJ‰z).value)
-            With ws•\.Cells(r, colEU_—\ZŠz3)
-                If dict—\Z.Exists(keyEQ) Then
-                    If Not (RESPECT_BOLD And IsNumeric(.value) And .Font.Bold) Then .value = dict—\Z(keyEQ)
+        ' EU(äºˆç®—é¡3)ï¼šå¹´åº¦ + å¤§äº‹æ¥­ + ç´°ã€…ç¯€ã€”ç¹°è¶Šæ˜è¨±åˆ†ã€•
+        If Nml(wsè¡¨.Cells(r, coläº‹æ¥­).value) <> "" And Nml(wsè¡¨.Cells(r, colç´°ã€…ç¯€ç¹°è¶Š).value) <> "" Then
+            keyEQ = MakeKey(yearStr, wsè¡¨.Cells(r, coläº‹æ¥­).value, wsè¡¨.Cells(r, colç´°ã€…ç¯€ç¹°è¶Š).value)
+            With wsè¡¨.Cells(r, colEU_äºˆç®—é¡3)
+                If dictäºˆç®—.Exists(keyEQ) Then
+                    If Not (RESPECT_BOLD And IsNumeric(.value) And .Font.Bold) Then .value = dictäºˆç®—(keyEQ)
                 Else
                     If Not (RESPECT_BOLD And IsNumeric(.value) And .Font.Bold) Then .ClearContents
                 End If
@@ -647,7 +646,7 @@ Sub —\ZŠz‚ğ•\‚É“]Ê()
 NextR:
     Next r
 
-    MsgBox "iÅIs=ƒL[—ñÅ‘åj•û®‚Åw—\ZŠzxw—\ZŠz3x‚Ö“]‹L‚µ‚Ü‚µ‚½B", vbInformation
+    MsgBox "ï¼ˆæœ€çµ‚è¡Œ=ã‚­ãƒ¼åˆ—æœ€å¤§ï¼‰æ–¹å¼ã§ã€äºˆç®—é¡ã€ã€äºˆç®—é¡3ã€ã¸è»¢è¨˜ã—ã¾ã—ãŸã€‚", vbInformation
 
 GoFinally:
     With Application
@@ -658,11 +657,11 @@ GoFinally:
     Exit Sub
 
 ErrHandler:
-    MsgBox "ƒGƒ‰[: " & Err.Description, vbExclamation
+    MsgBox "ã‚¨ãƒ©ãƒ¼: " & Err.Description, vbExclamation
     Resume GoFinally
 End Sub
 
-' ===== ƒwƒ‹ƒp[ =====
+' ===== ãƒ˜ãƒ«ãƒ‘ãƒ¼ =====
 
 Private Function GetColByHeaderAny(ws As Worksheet, headerRow As Long, names As Variant) As Long
     Dim lastCol As Long, c As Long, i As Long, h As String
@@ -698,27 +697,27 @@ Private Function FindLastColByHeaderAny(ws As Worksheet, headerRow As Long, name
     FindLastColByHeaderAny = 0
 End Function
 
-' Œ©o‚µ—p³‹K‰»
+' è¦‹å‡ºã—ç”¨æ­£è¦åŒ–
 Private Function NormalizeHeader(v As Variant) As String
     NormalizeHeader = Nml(v)
 End Function
 
-' ’l/ƒL[‹¤’Ê‚Ì³‹K‰»iNBSP/Tab‚àœ‹j
+' å€¤/ã‚­ãƒ¼å…±é€šã®æ­£è¦åŒ–ï¼ˆNBSP/Tabã‚‚é™¤å»ï¼‰
 Private Function Nml(ByVal v As Variant) As String
     Dim s As String
     On Error Resume Next
     s = CStr(IIf(IsError(v) Or IsNull(v), "", v))
     s = Replace(Replace(Replace(s, vbCr, ""), vbLf, ""), Chr(160), " ")
     s = Replace(s, vbTab, " ")
-    s = Trim(Replace(s, ChrW(&H3000), " ")) ' ‘SŠpƒXƒy[ƒX¨”¼Šp
-    s = StrConv(s, vbNarrow)                ' ‘SŠp‰p”¨”¼Šp
+    s = Trim(Replace(s, ChrW(&H3000), " ")) ' å…¨è§’ã‚¹ãƒšãƒ¼ã‚¹â†’åŠè§’
+    s = StrConv(s, vbNarrow)                ' å…¨è§’è‹±æ•°â†’åŠè§’
     Do While InStr(s, "  ") > 0
         s = Replace(s, "  ", " ")
     Loop
     Nml = s
 End Function
 
-' ˜a—ï‚Ì³‹K‰»FR07/H01/S10 ¨ R7/H1/S10
+' å’Œæš¦ã®æ­£è¦åŒ–ï¼šR07/H01/S10 â†’ R7/H1/S10
 Private Function NmlWareki(ByVal y As String) As String
     Dim s As String, era As String, i As Long, d As String
     s = Nml(y)
@@ -736,7 +735,7 @@ Private Function NmlWareki(ByVal y As String) As String
     NmlWareki = s
 End Function
 
-' —\ZA—ñƒL[‘S‘Ì‚ğ˜a—ï³‹K‰»iæ“ª‚ÌR/H/S‚Ì”š•”‚Ì‚İƒ[ƒ’×‚µj
+' äºˆç®—Aåˆ—ã‚­ãƒ¼å…¨ä½“ã‚’å’Œæš¦æ­£è¦åŒ–ï¼ˆå…ˆé ­ã®R/H/Sã®æ•°å­—éƒ¨ã®ã¿ã‚¼ãƒ­æ½°ã—ï¼‰
 Private Function NmlKey(ByVal k As String) As String
     Dim s As String, era As String, i As Long, d As String, rest As String
     s = Nml(k)
@@ -757,7 +756,7 @@ Private Function NmlKey(ByVal k As String) As String
     NmlKey = s
 End Function
 
-' ‹æØ‚è‚È‚µ˜AŒ‹iA—ñƒL[‚Æ“¯ˆêƒ‹[ƒ‹j
+' åŒºåˆ‡ã‚Šãªã—é€£çµï¼ˆAåˆ—ã‚­ãƒ¼ã¨åŒä¸€ãƒ«ãƒ¼ãƒ«ï¼‰
 Private Function MakeKey(ByVal y As String, ByVal a As String, ByVal b As String) As String
     MakeKey = NmlWareki(y) & Nml(a) & Nml(b)
 End Function
@@ -770,129 +769,129 @@ End Function
 Public Function NormalizeCompanyName(str As String) As String
     Dim tmp As String
     tmp = Trim(str)
-    tmp = Replace(tmp, "@", " ") ' ‘SŠpƒXƒy[ƒX ¨ ”¼Šp
-    tmp = Replace(tmp, "‡Š", "Š”®‰ïĞ")
-    tmp = StrConv(tmp, vbNarrow) ' ‘SŠp•¶š¨”¼Šp•¶š
-    tmp = Replace(tmp, " ", "")  ' ”¼ŠpƒXƒy[ƒXíœi•K—v‚É‰‚¶‚Äj
+    tmp = Replace(tmp, "ã€€", " ") ' å…¨è§’ã‚¹ãƒšãƒ¼ã‚¹ â†’ åŠè§’
+    tmp = Replace(tmp, "ãˆ±", "æ ªå¼ä¼šç¤¾")
+    tmp = StrConv(tmp, vbNarrow) ' å…¨è§’æ–‡å­—â†’åŠè§’æ–‡å­—
+    tmp = Replace(tmp, " ", "")  ' åŠè§’ã‚¹ãƒšãƒ¼ã‚¹å‰Šé™¤ï¼ˆå¿…è¦ã«å¿œã˜ã¦ï¼‰
     NormalizeCompanyName = tmp
 End Function
 
-Sub A—ñ‚É‹àŠzî•ñ‚ğƒRƒƒ“ƒg•\¦()
+Sub Aåˆ—ã«é‡‘é¡æƒ…å ±ã‚’ã‚³ãƒ¡ãƒ³ãƒˆè¡¨ç¤º()
 
     Dim ws As Worksheet
-    Set ws = ThisWorkbook.Sheets("•\")
+    Set ws = ThisWorkbook.Sheets("è¡¨")
 
-    Dim Â–±—ñ As Long, •â•—ñ As Long, Œ–¼—ñ As Long
-    Dim valW As Variant, valX As Variant, ƒRƒƒ“ƒg“à—e As String
+    Dim å‚µå‹™åˆ— As Long, è£œåŠ©åˆ— As Long, ä»¶ååˆ— As Long
+    Dim valW As Variant, valX As Variant, ã‚³ãƒ¡ãƒ³ãƒˆå†…å®¹ As String
     Dim row As Long, lastRow As Long, col As Long
 
-    ' ===== Œ©o‚µsi3s–Új‚©‚ç—ñ”Ô†‚ğ“Á’è =====
+    ' ===== è¦‹å‡ºã—è¡Œï¼ˆ3è¡Œç›®ï¼‰ã‹ã‚‰åˆ—ç•ªå·ã‚’ç‰¹å®š =====
     For col = 1 To ws.Cells(3, ws.Columns.Count).End(xlToLeft).Column
         Select Case ws.Cells(3, col).value
-            Case "Œ–¼": Œ–¼—ñ = col
-            Case "ÅIÂ–±•‰’SŠzi‡Œvj": Â–±—ñ = col
-            Case "•â•‘ÎÛŠzi–‹Æ”ïƒx[ƒXj": •â•—ñ = col
+            Case "ä»¶å": ä»¶ååˆ— = col
+            Case "æœ€çµ‚å‚µå‹™è² æ‹…é¡ï¼ˆåˆè¨ˆï¼‰": å‚µå‹™åˆ— = col
+            Case "è£œåŠ©å¯¾è±¡é¡ï¼ˆäº‹æ¥­è²»ãƒ™ãƒ¼ã‚¹ï¼‰": è£œåŠ©åˆ— = col
         End Select
     Next col
 
-    If Œ–¼—ñ = 0 Or Â–±—ñ = 0 Or •â•—ñ = 0 Then
-        MsgBox "Œ©o‚µ—ñ‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñB", vbExclamation
+    If ä»¶ååˆ— = 0 Or å‚µå‹™åˆ— = 0 Or è£œåŠ©åˆ— = 0 Then
+        MsgBox "è¦‹å‡ºã—åˆ—ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã€‚", vbExclamation
         Exit Sub
     End If
 
-    lastRow = ws.Cells(ws.Rows.Count, Œ–¼—ñ).End(xlUp).row
+    lastRow = ws.Cells(ws.Rows.Count, ä»¶ååˆ—).End(xlUp).row
 
     For row = 4 To lastRow
-        valW = ws.Cells(row, Â–±—ñ).value
-        valX = ws.Cells(row, •â•—ñ).value
+        valW = ws.Cells(row, å‚µå‹™åˆ—).value
+        valX = ws.Cells(row, è£œåŠ©åˆ—).value
 
-        With ws.Cells(row, 1) ' A—ñ
-            ' Šù‘¶ƒRƒƒ“ƒg‚ğíœi‹Œ/V‚Ì—¼‘Î‰j
+        With ws.Cells(row, 1) ' Aåˆ—
+            ' æ—¢å­˜ã‚³ãƒ¡ãƒ³ãƒˆã‚’å‰Šé™¤ï¼ˆæ—§/æ–°ã®ä¸¡å¯¾å¿œï¼‰
             On Error Resume Next
             If Not .Comment Is Nothing Then .Comment.Delete
             If Not .CommentThreaded Is Nothing Then .CommentThreaded.Delete
             On Error GoTo 0
 
             If Len(valW & vbNullString) > 0 And Len(valX & vbNullString) > 0 Then
-                ƒRƒƒ“ƒg“à—e = "ÅIÂ–±F" & Format(valW, "#,##0") & "‰~" & vbCrLf & _
-                             "•â•‘ÎÛF" & Format(valX, "#,##0") & "‰~"
-                ' ‹ŒƒRƒƒ“ƒgAPI ¨ ¸”s‚µ‚½‚çVƒRƒƒ“ƒgAPI
+                ã‚³ãƒ¡ãƒ³ãƒˆå†…å®¹ = "æœ€çµ‚å‚µå‹™ï¼š" & Format(valW, "#,##0") & "å††" & vbCrLf & _
+                             "è£œåŠ©å¯¾è±¡ï¼š" & Format(valX, "#,##0") & "å††"
+                ' æ—§ã‚³ãƒ¡ãƒ³ãƒˆAPI â†’ å¤±æ•—ã—ãŸã‚‰æ–°ã‚³ãƒ¡ãƒ³ãƒˆAPI
                 On Error Resume Next
-                .AddComment ƒRƒƒ“ƒg“à—e
+                .AddComment ã‚³ãƒ¡ãƒ³ãƒˆå†…å®¹
                 If Err.Number <> 0 Then
                     Err.Clear
-                    .AddCommentThreaded ƒRƒƒ“ƒg“à—e
+                    .AddCommentThreaded ã‚³ãƒ¡ãƒ³ãƒˆå†…å®¹
                 End If
                 On Error GoTo 0
             End If
         End With
     Next row
 
-    MsgBox "A—ñ‚Ö‚ÌƒRƒƒ“ƒg’Ç‰Á‚ªŠ®—¹‚µ‚Ü‚µ‚½B", vbInformation
+    MsgBox "Aåˆ—ã¸ã®ã‚³ãƒ¡ãƒ³ãƒˆè¿½åŠ ãŒå®Œäº†ã—ã¾ã—ãŸã€‚", vbInformation
 End Sub
 
 
 
 
-Sub “]‹L‚ÆƒKƒ“ƒgƒ`ƒƒ[ƒg¶¬_©“®’Šo•t‚«()
+Sub è»¢è¨˜ã¨ã‚¬ãƒ³ãƒˆãƒãƒ£ãƒ¼ãƒˆç”Ÿæˆ_è‡ªå‹•æŠ½å‡ºä»˜ã()
 
-    Dim ws•\ As Worksheet, wsHŠú•\ As Worksheet
-    Dim lastRow•\ As Long, lastRowHŠú•\ As Long
+    Dim wsè¡¨ As Worksheet, wså·¥æœŸè¡¨ As Worksheet
+    Dim lastRowè¡¨ As Long, lastRowå·¥æœŸè¡¨ As Long
     Dim i As Long, j As Long, outRow As Long
-    Dim headerRow•\ As Long: headerRow•\ = 3
-    Dim headerRowHŠú As Long: headerRowHŠú = 2
-    Dim “]‹LƒR[ƒh As String, startDate As Date, endDate As Date
-    Dim dict•\ As Object: Set dict•\ = CreateObject("Scripting.Dictionary")
-    Dim colMap•\ As Object: Set colMap•\ = CreateObject("Scripting.Dictionary")
-    Dim colMapHŠú As Object: Set colMapHŠú = CreateObject("Scripting.Dictionary")
+    Dim headerRowè¡¨ As Long: headerRowè¡¨ = 3
+    Dim headerRowå·¥æœŸ As Long: headerRowå·¥æœŸ = 2
+    Dim è»¢è¨˜ã‚³ãƒ¼ãƒ‰ As String, startDate As Date, endDate As Date
+    Dim dictè¡¨ As Object: Set dictè¡¨ = CreateObject("Scripting.Dictionary")
+    Dim colMapè¡¨ As Object: Set colMapè¡¨ = CreateObject("Scripting.Dictionary")
+    Dim colMapå·¥æœŸ As Object: Set colMapå·¥æœŸ = CreateObject("Scripting.Dictionary")
     Dim yearStr As String, baseYear As Integer, targetNendo As String, prevNendo As String
     Dim baseDate As Date, maxDays As Long: maxDays = 730
-    Dim startCol As Long  ' šŠJn—ñ‚ÍŒã‚ÅgŒ©o‚µs2‚ÌÅ‰E”ñ“ú•t‚ÌŸ—ñh‚Æ‚µ‚ÄŒˆ’è
+    Dim startCol As Long  ' â˜…é–‹å§‹åˆ—ã¯å¾Œã§â€œè¦‹å‡ºã—è¡Œ2ã®æœ€å³éæ—¥ä»˜ã®æ¬¡åˆ—â€ã¨ã—ã¦æ±ºå®š
 
     Application.ScreenUpdating = False
 
-    Set ws•\ = Worksheets("•\")
-    Set wsHŠú•\ = Worksheets("HŠú•\")
+    Set wsè¡¨ = Worksheets("è¡¨")
+    Set wså·¥æœŸè¡¨ = Worksheets("å·¥æœŸè¡¨")
 
-    ' === ”N“x•ÏŠ· ===
-    yearStr = Trim(wsHŠú•\.Range("J1").value)
-    If yearStr Like "—ß˜a*”N“x" Then
+    ' === å¹´åº¦å¤‰æ› ===
+    yearStr = Trim(wså·¥æœŸè¡¨.Range("J1").value)
+    If yearStr Like "ä»¤å’Œ*å¹´åº¦" Then
         baseYear = val(Mid(yearStr, 3, Len(yearStr) - 4)) + 2018
         targetNendo = "R" & val(Mid(yearStr, 3, Len(yearStr) - 4))
         prevNendo = "R" & (val(Mid(yearStr, 3, Len(yearStr) - 4)) - 1)
     Else
-        MsgBox "J1ƒZƒ‹‚Éu—ß˜aü”N“xv‚ÌŒ`®‚Å“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B", vbExclamation
+        MsgBox "J1ã‚»ãƒ«ã«ã€Œä»¤å’Œâ—¯å¹´åº¦ã€ã®å½¢å¼ã§å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚", vbExclamation
         Exit Sub
     End If
     baseDate = DateSerial(baseYear, 4, 1)
 
-    ' === Œ©o‚µƒ}ƒbƒsƒ“ƒO ===
-    For j = 1 To ws•\.Cells(headerRow•\, Columns.Count).End(xlToLeft).Column
-        colMap•\(ws•\.Cells(headerRow•\, j).value) = j
-        If ws•\.Cells(headerRow•\, j).value Like "*n*" And InStr(ws•\.Cells(headerRow•\, j).value, vbLf) > 0 Then
-            colMap•\("niÅIj") = j
+    ' === è¦‹å‡ºã—ãƒãƒƒãƒ”ãƒ³ã‚° ===
+    For j = 1 To wsè¡¨.Cells(headerRowè¡¨, Columns.Count).End(xlToLeft).Column
+        colMapè¡¨(wsè¡¨.Cells(headerRowè¡¨, j).value) = j
+        If wsè¡¨.Cells(headerRowè¡¨, j).value Like "*å§‹*" And InStr(wsè¡¨.Cells(headerRowè¡¨, j).value, vbLf) > 0 Then
+            colMapè¡¨("å§‹ï¼ˆæœ€çµ‚ï¼‰") = j
         End If
-        If ws•\.Cells(headerRow•\, j).value Like "*I*" And InStr(ws•\.Cells(headerRow•\, j).value, vbLf) > 0 Then
-            colMap•\("IiÅIj") = j
+        If wsè¡¨.Cells(headerRowè¡¨, j).value Like "*çµ‚*" And InStr(wsè¡¨.Cells(headerRowè¡¨, j).value, vbLf) > 0 Then
+            colMapè¡¨("çµ‚ï¼ˆæœ€çµ‚ï¼‰") = j
         End If
     Next j
 
-    For j = 1 To wsHŠú•\.Cells(headerRowHŠú, Columns.Count).End(xlToLeft).Column
-        colMapHŠú(wsHŠú•\.Cells(headerRowHŠú, j).value) = j
-        If wsHŠú•\.Cells(headerRowHŠú, j).value Like "*n*" And InStr(wsHŠú•\.Cells(headerRowHŠú, j).value, vbLf) > 0 Then
-            colMapHŠú("niÅIj") = j
+    For j = 1 To wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ, Columns.Count).End(xlToLeft).Column
+        colMapå·¥æœŸ(wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ, j).value) = j
+        If wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ, j).value Like "*å§‹*" And InStr(wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ, j).value, vbLf) > 0 Then
+            colMapå·¥æœŸ("å§‹ï¼ˆæœ€çµ‚ï¼‰") = j
         End If
-        If wsHŠú•\.Cells(headerRowHŠú, j).value Like "*I*" And InStr(wsHŠú•\.Cells(headerRowHŠú, j).value, vbLf) > 0 Then
-            colMapHŠú("IiÅIj") = j
+        If wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ, j).value Like "*çµ‚*" And InStr(wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ, j).value, vbLf) > 0 Then
+            colMapå·¥æœŸ("çµ‚ï¼ˆæœ€çµ‚ï¼‰") = j
         End If
     Next j
-    ' === ƒKƒ“ƒgŠJn—ñ‚ğgŒ©o‚µs2‚ÌÅ‰E”ñ“ú•tƒZƒ‹‚ÌŸ—ñh‚Å“®“IŒˆ’è ===
-    ' Šù‘¶‚ÌÀs‚Å“ú•t‚ª‰E‘¤‚Éc‚Á‚Ä‚¢‚Ä‚àAÅŒã‚Ìg”ñ“ú•th‚ğ’T‚µ‚Ä‚»‚Ì‰E—×‚©‚çƒKƒ“ƒgŠJn
+    ' === ã‚¬ãƒ³ãƒˆé–‹å§‹åˆ—ã‚’â€œè¦‹å‡ºã—è¡Œ2ã®æœ€å³éæ—¥ä»˜ã‚»ãƒ«ã®æ¬¡åˆ—â€ã§å‹•çš„æ±ºå®š ===
+    ' æ—¢å­˜ã®å®Ÿè¡Œã§æ—¥ä»˜ãŒå³å´ã«æ®‹ã£ã¦ã„ã¦ã‚‚ã€æœ€å¾Œã®â€œéæ—¥ä»˜â€ã‚’æ¢ã—ã¦ãã®å³éš£ã‹ã‚‰ã‚¬ãƒ³ãƒˆé–‹å§‹
     Dim lastHeadCol As Long, lastNonDateCol As Long, c As Long, v
-    lastHeadCol = wsHŠú•\.Cells(headerRowHŠú, wsHŠú•\.Columns.Count).End(xlToLeft).Column
+    lastHeadCol = wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ, wså·¥æœŸè¡¨.Columns.Count).End(xlToLeft).Column
     lastNonDateCol = 1
     For c = lastHeadCol To 1 Step -1
-        v = wsHŠú•\.Cells(headerRowHŠú, c).value
+        v = wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ, c).value
         If Len(v) > 0 Then
             If Not IsDate(v) Then
                 lastNonDateCol = c
@@ -900,105 +899,105 @@ Sub “]‹L‚ÆƒKƒ“ƒgƒ`ƒƒ[ƒg¶¬_©“®’Šo•t‚«()
             End If
         End If
     Next c
-    startCol = lastNonDateCol + 1   ' š‚±‚±‚ªƒKƒ“ƒg‚ÌŠJn—ñi= 2s‘‚¦‚½‚ç+2‚É©‘R‚É’Ç]j
-    ' === “]‹LƒR[ƒh’ŠoiğŒ•t‚«j ===
-    wsHŠú•\.Range("A3:A1000").ClearContents
+    startCol = lastNonDateCol + 1   ' â˜…ã“ã“ãŒã‚¬ãƒ³ãƒˆã®é–‹å§‹åˆ—ï¼ˆ= 2è¡Œå¢—ãˆãŸã‚‰+2ã«è‡ªç„¶ã«è¿½å¾“ï¼‰
+    ' === è»¢è¨˜ã‚³ãƒ¼ãƒ‰æŠ½å‡ºï¼ˆæ¡ä»¶ä»˜ãï¼‰ ===
+    wså·¥æœŸè¡¨.Range("A3:A1000").ClearContents
     outRow = 3
-    lastRow•\ = ws•\.Cells(ws•\.Rows.Count, 1).End(xlUp).row
+    lastRowè¡¨ = wsè¡¨.Cells(wsè¡¨.Rows.Count, 1).End(xlUp).row
 
-    For i = headerRow•\ + 1 To lastRow•\
-        Dim nendoVal As String: nendoVal = Trim(ws•\.Cells(i, colMap•\("”N“x")).value)
-        Dim ŒJ‰z–¾‹– As String: ŒJ‰z–¾‹– = Trim(ws•\.Cells(i, colMap•\("×XßkŒJ‰z–¾‹–•ªl")).value)
-        Dim ×Xß As String: ×Xß = Trim(ws•\.Cells(i, colMap•\("×Xß")).value)
-        “]‹LƒR[ƒh = Trim(ws•\.Cells(i, colMap•\("“]‹L")).value)
+    For i = headerRowè¡¨ + 1 To lastRowè¡¨
+        Dim nendoVal As String: nendoVal = Trim(wsè¡¨.Cells(i, colMapè¡¨("å¹´åº¦")).value)
+        Dim ç¹°è¶Šæ˜è¨± As String: ç¹°è¶Šæ˜è¨± = Trim(wsè¡¨.Cells(i, colMapè¡¨("ç´°ã€…ç¯€ã€”ç¹°è¶Šæ˜è¨±åˆ†ã€•")).value)
+        Dim ç´°ã€…ç¯€ As String: ç´°ã€…ç¯€ = Trim(wsè¡¨.Cells(i, colMapè¡¨("ç´°ã€…ç¯€")).value)
+        è»¢è¨˜ã‚³ãƒ¼ãƒ‰ = Trim(wsè¡¨.Cells(i, colMapè¡¨("è»¢è¨˜")).value)
 
-        If “]‹LƒR[ƒh <> "" Then
-            If (nendoVal = targetNendo Or (nendoVal = prevNendo And ŒJ‰z–¾‹– <> "")) _
-               And InStr(×Xß, "“y’nw“ü”ï") = 0 _
-               And InStr(ŒJ‰z–¾‹–, "“y’nw“ü”ï") = 0 Then
-                wsHŠú•\.Cells(outRow, 1).value = “]‹LƒR[ƒh
+        If è»¢è¨˜ã‚³ãƒ¼ãƒ‰ <> "" Then
+            If (nendoVal = targetNendo Or (nendoVal = prevNendo And ç¹°è¶Šæ˜è¨± <> "")) _
+               And InStr(ç´°ã€…ç¯€, "åœŸåœ°è³¼å…¥è²»") = 0 _
+               And InStr(ç¹°è¶Šæ˜è¨±, "åœŸåœ°è³¼å…¥è²»") = 0 Then
+                wså·¥æœŸè¡¨.Cells(outRow, 1).value = è»¢è¨˜ã‚³ãƒ¼ãƒ‰
                 outRow = outRow + 1
             End If
         End If
     Next i
 
-    ' === ‰¡²iƒKƒ“ƒg“ú•t•Œƒ‰ƒxƒ‹j ===
+    ' === æ¨ªè»¸ï¼ˆã‚¬ãƒ³ãƒˆæ—¥ä»˜ï¼†æœˆãƒ©ãƒ™ãƒ«ï¼‰ ===
     For j = 0 To maxDays - 1
         Dim d As Date: d = baseDate + j
-        wsHŠú•\.Cells(headerRowHŠú, startCol + j).value = d
-        wsHŠú•\.Cells(headerRowHŠú, startCol + j).NumberFormat = "m/d"
-        wsHŠú•\.Columns(startCol + j).ColumnWidth = 1
+        wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ, startCol + j).value = d
+        wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ, startCol + j).NumberFormat = "m/d"
+        wså·¥æœŸè¡¨.Columns(startCol + j).ColumnWidth = 1
         If Day(d) = 1 Then
-            wsHŠú•\.Cells(headerRowHŠú - 1, startCol + j).value = Month(d) & "Œ"
-            wsHŠú•\.Cells(headerRowHŠú - 1, startCol + j).HorizontalAlignment = xlCenter
+            wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ - 1, startCol + j).value = Month(d) & "æœˆ"
+            wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ - 1, startCol + j).HorizontalAlignment = xlCenter
         Else
-            wsHŠú•\.Cells(headerRowHŠú - 1, startCol + j).value = ""
+            wså·¥æœŸè¡¨.Cells(headerRowå·¥æœŸ - 1, startCol + j).value = ""
         End If
     Next j
 
-    ' === “]‹LƒR[ƒh ¨ •\ƒV[ƒg‚Ìs”Ô†ƒ}ƒbƒsƒ“ƒO ===
-    For i = headerRow•\ + 1 To lastRow•\
-        “]‹LƒR[ƒh = Trim(ws•\.Cells(i, colMap•\("“]‹L")).value)
-        If “]‹LƒR[ƒh <> "" Then dict•\(“]‹LƒR[ƒh) = i
+    ' === è»¢è¨˜ã‚³ãƒ¼ãƒ‰ â†’ è¡¨ã‚·ãƒ¼ãƒˆã®è¡Œç•ªå·ãƒãƒƒãƒ”ãƒ³ã‚° ===
+    For i = headerRowè¡¨ + 1 To lastRowè¡¨
+        è»¢è¨˜ã‚³ãƒ¼ãƒ‰ = Trim(wsè¡¨.Cells(i, colMapè¡¨("è»¢è¨˜")).value)
+        If è»¢è¨˜ã‚³ãƒ¼ãƒ‰ <> "" Then dictè¡¨(è»¢è¨˜ã‚³ãƒ¼ãƒ‰) = i
     Next i
 
-    ' === “]‹L•ƒKƒ“ƒgƒ`ƒƒ[ƒg•`‰æ ===
-    lastRowHŠú•\ = wsHŠú•\.Cells(wsHŠú•\.Rows.Count, 1).End(xlUp).row
+    ' === è»¢è¨˜ï¼†ã‚¬ãƒ³ãƒˆãƒãƒ£ãƒ¼ãƒˆæç”» ===
+    lastRowå·¥æœŸè¡¨ = wså·¥æœŸè¡¨.Cells(wså·¥æœŸè¡¨.Rows.Count, 1).End(xlUp).row
 
-    For i = headerRowHŠú + 1 To lastRowHŠú•\
-        “]‹LƒR[ƒh = Trim(wsHŠú•\.Cells(i, colMapHŠú("“]‹LƒR[ƒh")).value)
-        If “]‹LƒR[ƒh <> "" And dict•\.Exists(“]‹LƒR[ƒh) Then
+    For i = headerRowå·¥æœŸ + 1 To lastRowå·¥æœŸè¡¨
+        è»¢è¨˜ã‚³ãƒ¼ãƒ‰ = Trim(wså·¥æœŸè¡¨.Cells(i, colMapå·¥æœŸ("è»¢è¨˜ã‚³ãƒ¼ãƒ‰")).value)
+        If è»¢è¨˜ã‚³ãƒ¼ãƒ‰ <> "" And dictè¡¨.Exists(è»¢è¨˜ã‚³ãƒ¼ãƒ‰) Then
 
-            Dim srcRow As Long: srcRow = dict•\(“]‹LƒR[ƒh)
+            Dim srcRow As Long: srcRow = dictè¡¨(è»¢è¨˜ã‚³ãƒ¼ãƒ‰)
             Dim isPaid As Boolean: isPaid = False
 
-            ' ‹àŠz3iEJ—ñj‚É’l‚ª‚ ‚é‚©”»’è
-            If colMap•\.Exists("‹àŠz3") Then
-                If IsNumeric(ws•\.Cells(srcRow, colMap•\("‹àŠz3")).value) Then
-                    If ws•\.Cells(srcRow, colMap•\("‹àŠz3")).value <> 0 Then
+            ' é‡‘é¡3ï¼ˆEJåˆ—ï¼‰ã«å€¤ãŒã‚ã‚‹ã‹åˆ¤å®š
+            If colMapè¡¨.Exists("é‡‘é¡3") Then
+                If IsNumeric(wsè¡¨.Cells(srcRow, colMapè¡¨("é‡‘é¡3")).value) Then
+                    If wsè¡¨.Cells(srcRow, colMapè¡¨("é‡‘é¡3")).value <> 0 Then
                         isPaid = True
                     End If
                 End If
             End If
 
-            ' “]‹L•ƒKƒ“ƒgƒZƒ‹ƒNƒŠƒAi‰¡€–Ú‚Í targetCols ‚©‚çÅ‘å—ñ‚ğ“®“I‚Éæ“¾j
-            ' --- æ‚É targetCols ‚ğ’è‹`‚µ‚Ä‚©‚çƒNƒŠƒA”ÍˆÍ‚ğŒˆ‚ß‚é ---
+            ' è»¢è¨˜ï¼†ã‚¬ãƒ³ãƒˆã‚»ãƒ«ã‚¯ãƒªã‚¢ï¼ˆæ¨ªé …ç›®ã¯ targetCols ã‹ã‚‰æœ€å¤§åˆ—ã‚’å‹•çš„ã«å–å¾—ï¼‰
+            ' --- å…ˆã« targetCols ã‚’å®šç¾©ã—ã¦ã‹ã‚‰ã‚¯ãƒªã‚¢ç¯„å›²ã‚’æ±ºã‚ã‚‹ ---
             Dim targetCols As Variant, maxItemCol As Long
-            targetCols = Array("Œ–¼", "{H‹ÆÒEÂŒ Ò", "’S“–Ò", "niÅIj", "IiÅIj", _
-                               "ÅIÂ–±•‰’SŠzi‡Œvj", "H–“à—eiÅIj", _
-                               "×Xß", "×XßkŒJ‰z–¾‹–•ªl")   ' š‚±‚±‚Å2€–Ú‚ğ’Ç‰Á
+            targetCols = Array("ä»¶å", "æ–½å·¥æ¥­è€…ãƒ»å‚µæ¨©è€…", "æ‹…å½“è€…", "å§‹ï¼ˆæœ€çµ‚ï¼‰", "çµ‚ï¼ˆæœ€çµ‚ï¼‰", _
+                               "æœ€çµ‚å‚µå‹™è² æ‹…é¡ï¼ˆåˆè¨ˆï¼‰", "å·¥äº‹å†…å®¹ï¼ˆæœ€çµ‚ï¼‰", _
+                               "ç´°ã€…ç¯€", "ç´°ã€…ç¯€ã€”ç¹°è¶Šæ˜è¨±åˆ†ã€•")   ' â˜…ã“ã“ã§2é …ç›®ã‚’è¿½åŠ 
 
-            ' ’Ç‰Á—ñ‚ªH—ñ‚æ‚è‰E‚Å‚àcŸæ‚ªo‚È‚¢‚æ‚¤‚ÉƒNƒŠƒA”ÍˆÍ‚ğ‰Â•Ï‰»
-            maxItemCol = 8   ' Šù’èiH—ñ‘Š“–j
+            ' è¿½åŠ åˆ—ãŒHåˆ—ã‚ˆã‚Šå³ã§ã‚‚æ®‹æ»“ãŒå‡ºãªã„ã‚ˆã†ã«ã‚¯ãƒªã‚¢ç¯„å›²ã‚’å¯å¤‰åŒ–
+            maxItemCol = 8   ' æ—¢å®šï¼ˆHåˆ—ç›¸å½“ï¼‰
             For j = LBound(targetCols) To UBound(targetCols)
-                If colMapHŠú.Exists(targetCols(j)) Then
-                    If colMapHŠú(targetCols(j)) > maxItemCol Then maxItemCol = colMapHŠú(targetCols(j))
+                If colMapå·¥æœŸ.Exists(targetCols(j)) Then
+                    If colMapå·¥æœŸ(targetCols(j)) > maxItemCol Then maxItemCol = colMapå·¥æœŸ(targetCols(j))
                 End If
             Next j
 
-            wsHŠú•\.Range(wsHŠú•\.Cells(i, 2), wsHŠú•\.Cells(i, maxItemCol)).ClearContents
-            wsHŠú•\.Range(wsHŠú•\.Cells(i, startCol), wsHŠú•\.Cells(i, startCol + maxDays - 1)).ClearContents
-            wsHŠú•\.Range(wsHŠú•\.Cells(i, startCol), wsHŠú•\.Cells(i, startCol + maxDays - 1)).ClearFormats
+            wså·¥æœŸè¡¨.Range(wså·¥æœŸè¡¨.Cells(i, 2), wså·¥æœŸè¡¨.Cells(i, maxItemCol)).ClearContents
+            wså·¥æœŸè¡¨.Range(wså·¥æœŸè¡¨.Cells(i, startCol), wså·¥æœŸè¡¨.Cells(i, startCol + maxDays - 1)).ClearContents
+            wså·¥æœŸè¡¨.Range(wså·¥æœŸè¡¨.Cells(i, startCol), wså·¥æœŸè¡¨.Cells(i, startCol + maxDays - 1)).ClearFormats
 
-            ' €–Ú“]‹Li”z—ñ‚É—ñ‹“‚µ‚½Œ©o‚µ‚ğƒwƒbƒ_[ˆê’v‚ÅƒRƒs[j
+            ' é …ç›®è»¢è¨˜ï¼ˆé…åˆ—ã«åˆ—æŒ™ã—ãŸè¦‹å‡ºã—ã‚’ãƒ˜ãƒƒãƒ€ãƒ¼ä¸€è‡´ã§ã‚³ãƒ”ãƒ¼ï¼‰
             For j = LBound(targetCols) To UBound(targetCols)
-                If colMap•\.Exists(targetCols(j)) And colMapHŠú.Exists(targetCols(j)) Then
-                    wsHŠú•\.Cells(i, colMapHŠú(targetCols(j))).value = ws•\.Cells(srcRow, colMap•\(targetCols(j))).value
+                If colMapè¡¨.Exists(targetCols(j)) And colMapå·¥æœŸ.Exists(targetCols(j)) Then
+                    wså·¥æœŸè¡¨.Cells(i, colMapå·¥æœŸ(targetCols(j))).value = wsè¡¨.Cells(srcRow, colMapè¡¨(targetCols(j))).value
                 End If
             Next j
 
-            ' ƒKƒ“ƒg•`‰æix•¥‚¢Ï‚İÔ^–¢•¥‚¢Âj
-            If IsDate(wsHŠú•\.Cells(i, colMapHŠú("niÅIj")).value) And IsDate(wsHŠú•\.Cells(i, colMapHŠú("IiÅIj")).value) Then
-                startDate = wsHŠú•\.Cells(i, colMapHŠú("niÅIj")).value
-                endDate = wsHŠú•\.Cells(i, colMapHŠú("IiÅIj")).value
+            ' ã‚¬ãƒ³ãƒˆæç”»ï¼ˆæ”¯æ‰•ã„æ¸ˆã¿ï¼èµ¤ï¼æœªæ‰•ã„ï¼é’ï¼‰
+            If IsDate(wså·¥æœŸè¡¨.Cells(i, colMapå·¥æœŸ("å§‹ï¼ˆæœ€çµ‚ï¼‰")).value) And IsDate(wså·¥æœŸè¡¨.Cells(i, colMapå·¥æœŸ("çµ‚ï¼ˆæœ€çµ‚ï¼‰")).value) Then
+                startDate = wså·¥æœŸè¡¨.Cells(i, colMapå·¥æœŸ("å§‹ï¼ˆæœ€çµ‚ï¼‰")).value
+                endDate = wså·¥æœŸè¡¨.Cells(i, colMapå·¥æœŸ("çµ‚ï¼ˆæœ€çµ‚ï¼‰")).value
                 For j = 0 To maxDays - 1
                     Dim currentDate As Date: currentDate = baseDate + j
-                    With wsHŠú•\.Cells(i, startCol + j)
+                    With wså·¥æœŸè¡¨.Cells(i, startCol + j)
                         If currentDate >= startDate And currentDate <= endDate Then
                             If isPaid Then
-                                .Interior.Color = RGB(255, 0, 0)          ' x•¥‚¢Ï‚İFÔ
+                                .Interior.Color = RGB(255, 0, 0)          ' æ”¯æ‰•ã„æ¸ˆã¿ï¼šèµ¤
                             Else
-                                .Interior.Color = RGB(91, 155, 213)       ' –¢•¥‚¢FÂ
+                                .Interior.Color = RGB(91, 155, 213)       ' æœªæ‰•ã„ï¼šé’
                             End If
                         End If
                     End With
@@ -1008,33 +1007,33 @@ Sub “]‹L‚ÆƒKƒ“ƒgƒ`ƒƒ[ƒg¶¬_©“®’Šo•t‚«()
     Next i
 
     Application.ScreenUpdating = True
-    MsgBox "“]‹L‚ÆƒKƒ“ƒgƒ`ƒƒ[ƒg‚Ì¶¬‚ªŠ®—¹‚µ‚Ü‚µ‚½I", vbInformation
+    MsgBox "è»¢è¨˜ã¨ã‚¬ãƒ³ãƒˆãƒãƒ£ãƒ¼ãƒˆã®ç”ŸæˆãŒå®Œäº†ã—ã¾ã—ãŸï¼", vbInformation
 
 End Sub
 
-Sub HŠú•\_ƒŠƒZƒbƒg()
+Sub å·¥æœŸè¡¨_ãƒªã‚»ãƒƒãƒˆ()
 
     Dim ws As Worksheet
-    Dim startCol As Long           ' šŠJn—ñ‚ÍŒã‚ÅŒˆ’è
+    Dim startCol As Long           ' â˜…é–‹å§‹åˆ—ã¯å¾Œã§æ±ºå®š
     Dim maxDays As Long: maxDays = 730
-    Dim headerRowHŠú As Long: headerRowHŠú = 2
+    Dim headerRowå·¥æœŸ As Long: headerRowå·¥æœŸ = 2
     Dim clearRowStart As Long: clearRowStart = 3
     Dim lastRow As Long, i As Long
 
-    Set ws = Worksheets("HŠú•\")
+    Set ws = Worksheets("å·¥æœŸè¡¨")
     Application.ScreenUpdating = False
 
-    ' === ƒtƒBƒ‹ƒ^[‚ª‚©‚©‚Á‚Ä‚¢‚éê‡‚Í‰ğœi‘Ss•\¦‚É–ß‚·j ===
+    ' === ãƒ•ã‚£ãƒ«ã‚¿ãƒ¼ãŒã‹ã‹ã£ã¦ã„ã‚‹å ´åˆã¯è§£é™¤ï¼ˆå…¨è¡Œè¡¨ç¤ºã«æˆ»ã™ï¼‰ ===
     On Error Resume Next
     ws.ShowAllData
     On Error GoTo 0
 
-    ' === ƒKƒ“ƒgŠJn—ñ‚ğ"Œ©o‚µs2‚ÌÅ‰E”ñ“ú•tƒZƒ‹‚ÌŸ—ñ"‚Å“®“IŒˆ’è ===
+    ' === ã‚¬ãƒ³ãƒˆé–‹å§‹åˆ—ã‚’"è¦‹å‡ºã—è¡Œ2ã®æœ€å³éæ—¥ä»˜ã‚»ãƒ«ã®æ¬¡åˆ—"ã§å‹•çš„æ±ºå®š ===
     Dim lastHeadCol As Long, lastNonDateCol As Long, c As Long, v
-    lastHeadCol = ws.Cells(headerRowHŠú, ws.Columns.Count).End(xlToLeft).Column
+    lastHeadCol = ws.Cells(headerRowå·¥æœŸ, ws.Columns.Count).End(xlToLeft).Column
     lastNonDateCol = 1
     For c = lastHeadCol To 1 Step -1
-        v = ws.Cells(headerRowHŠú, c).value
+        v = ws.Cells(headerRowå·¥æœŸ, c).value
         If Len(v) > 0 Then
             If Not IsDate(v) Then
                 lastNonDateCol = c
@@ -1044,45 +1043,45 @@ Sub HŠú•\_ƒŠƒZƒbƒg()
     Next c
     startCol = lastNonDateCol + 1
 
-    ' ÅIs‚ğæ“¾i“]‹LƒR[ƒh—ñ‚ªŠî€j
+    ' æœ€çµ‚è¡Œã‚’å–å¾—ï¼ˆè»¢è¨˜ã‚³ãƒ¼ãƒ‰åˆ—ãŒåŸºæº–ï¼‰
     lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).row
 
-    ' A—ñ`J—ñ‚ğƒNƒŠƒAi“]‹LƒR[ƒh{“]‹L€–Új
+    ' Aåˆ—ï½Jåˆ—ã‚’ã‚¯ãƒªã‚¢ï¼ˆè»¢è¨˜ã‚³ãƒ¼ãƒ‰ï¼‹è»¢è¨˜é …ç›®ï¼‰
     ws.Range(ws.Cells(clearRowStart, 1), ws.Cells(lastRow, 10)).ClearContents
 
-    ' I—ñˆÈ~iƒKƒ“ƒgƒ`ƒƒ[ƒg•”•ªj‚ğƒNƒŠƒA
+    ' Iåˆ—ä»¥é™ï¼ˆã‚¬ãƒ³ãƒˆãƒãƒ£ãƒ¼ãƒˆéƒ¨åˆ†ï¼‰ã‚’ã‚¯ãƒªã‚¢
     For i = clearRowStart To lastRow
         ws.Range(ws.Cells(i, startCol), ws.Cells(i, startCol + maxDays - 1)).ClearContents
         ws.Range(ws.Cells(i, startCol), ws.Cells(i, startCol + maxDays - 1)).ClearFormats
     Next i
 
-    MsgBox "HŠú•\‚ÌƒŠƒZƒbƒg‚ªŠ®—¹‚µ‚Ü‚µ‚½B", vbInformation
+    MsgBox "å·¥æœŸè¡¨ã®ãƒªã‚»ãƒƒãƒˆãŒå®Œäº†ã—ã¾ã—ãŸã€‚", vbInformation
     Application.ScreenUpdating = True
 
 End Sub
 
 '========================================
-' Ô‚¢ƒKƒ“ƒgƒo[‚ª1‚Â‚Å‚à‚ ‚és‚ğŠÛ‚²‚Æ”ñ•\¦
+' èµ¤ã„ã‚¬ãƒ³ãƒˆãƒãƒ¼ãŒ1ã¤ã§ã‚‚ã‚ã‚‹è¡Œã‚’ä¸¸ã”ã¨éè¡¨ç¤º
 '========================================
 Sub HideRedGanttBars()
 
     Dim ws As Worksheet
-    Dim startCol As Long           ' ƒKƒ“ƒgŠJn—ñi“®“IŒˆ’èj
+    Dim startCol As Long           ' ã‚¬ãƒ³ãƒˆé–‹å§‹åˆ—ï¼ˆå‹•çš„æ±ºå®šï¼‰
     Dim maxDays As Long: maxDays = 730
-    Dim headerRowHŠú As Long: headerRowHŠú = 2
+    Dim headerRowå·¥æœŸ As Long: headerRowå·¥æœŸ = 2
     Dim lastRow As Long, i As Long, j As Long
     Dim hasRedBar As Boolean
 
-    Set ws = Worksheets("HŠú•\")
+    Set ws = Worksheets("å·¥æœŸè¡¨")
     Application.ScreenUpdating = False
 
-    ' === ƒKƒ“ƒgŠJn—ñ‚ğ"Œ©o‚µs2‚ÌÅ‰E”ñ“ú•tƒZƒ‹‚ÌŸ—ñ"‚Å“®“IŒˆ’è ===
-    ' Šù‘¶ƒƒWƒbƒN‚ÆŠ®‘S‚É“¯‚¶
+    ' === ã‚¬ãƒ³ãƒˆé–‹å§‹åˆ—ã‚’"è¦‹å‡ºã—è¡Œ2ã®æœ€å³éæ—¥ä»˜ã‚»ãƒ«ã®æ¬¡åˆ—"ã§å‹•çš„æ±ºå®š ===
+    ' æ—¢å­˜ãƒ­ã‚¸ãƒƒã‚¯ã¨å®Œå…¨ã«åŒã˜
     Dim lastHeadCol As Long, lastNonDateCol As Long, c As Long, v
-    lastHeadCol = ws.Cells(headerRowHŠú, ws.Columns.Count).End(xlToLeft).Column
+    lastHeadCol = ws.Cells(headerRowå·¥æœŸ, ws.Columns.Count).End(xlToLeft).Column
     lastNonDateCol = 1
     For c = lastHeadCol To 1 Step -1
-        v = ws.Cells(headerRowHŠú, c).value
+        v = ws.Cells(headerRowå·¥æœŸ, c).value
         If Len(v) > 0 Then
             If Not IsDate(v) Then
                 lastNonDateCol = c
@@ -1092,24 +1091,24 @@ Sub HideRedGanttBars()
     Next c
     startCol = lastNonDateCol + 1
 
-    ' “]‹LƒR[ƒh—ñiA—ñj‚ğŠî€‚ÉÅIs‚ğæ“¾
+    ' è»¢è¨˜ã‚³ãƒ¼ãƒ‰åˆ—ï¼ˆAåˆ—ï¼‰ã‚’åŸºæº–ã«æœ€çµ‚è¡Œã‚’å–å¾—
     lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).row
 
-    ' ƒf[ƒ^si3s–ÚˆÈ~j‚ğƒ‹[ƒv
+    ' ãƒ‡ãƒ¼ã‚¿è¡Œï¼ˆ3è¡Œç›®ä»¥é™ï¼‰ã‚’ãƒ«ãƒ¼ãƒ—
     For i = 3 To lastRow
-        ' “]‹LƒR[ƒh‚ª‚ ‚és‚¾‚¯ˆ—
+        ' è»¢è¨˜ã‚³ãƒ¼ãƒ‰ãŒã‚ã‚‹è¡Œã ã‘å‡¦ç†
         If Trim(ws.Cells(i, 1).value) <> "" Then
             hasRedBar = False
             
-            ' ƒKƒ“ƒg”ÍˆÍistartCol ` startCol + maxDays - 1j‚ğƒ`ƒFƒbƒN
+            ' ã‚¬ãƒ³ãƒˆç¯„å›²ï¼ˆstartCol ï½ startCol + maxDays - 1ï¼‰ã‚’ãƒã‚§ãƒƒã‚¯
             For j = 0 To maxDays - 1
                 If ws.Cells(i, startCol + j).Interior.Color = RGB(255, 0, 0) Then
                     hasRedBar = True
-                    Exit For   ' Ô‚¢ƒZƒ‹‚ª1‚Â‚Å‚àŒ©‚Â‚©‚Á‚½‚ç‘¦À‚É”»’èI—¹
+                    Exit For   ' èµ¤ã„ã‚»ãƒ«ãŒ1ã¤ã§ã‚‚è¦‹ã¤ã‹ã£ãŸã‚‰å³åº§ã«åˆ¤å®šçµ‚äº†
                 End If
             Next j
             
-            ' Ô‚¢ƒKƒ“ƒgƒo[‚ª‚ ‚ê‚Îs‘S‘Ì‚ğ”ñ•\¦
+            ' èµ¤ã„ã‚¬ãƒ³ãƒˆãƒãƒ¼ãŒã‚ã‚Œã°è¡Œå…¨ä½“ã‚’éè¡¨ç¤º
             If hasRedBar Then
                 ws.Rows(i).Hidden = True
             End If
@@ -1117,12 +1116,12 @@ Sub HideRedGanttBars()
     Next i
 
     Application.ScreenUpdating = True
-    MsgBox "Ô‚¢ƒKƒ“ƒgƒo[‚ğŠÜ‚Şs‚ğ”ñ•\¦‚É‚µ‚Ü‚µ‚½B", vbInformation
+    MsgBox "èµ¤ã„ã‚¬ãƒ³ãƒˆãƒãƒ¼ã‚’å«ã‚€è¡Œã‚’éè¡¨ç¤ºã«ã—ã¾ã—ãŸã€‚", vbInformation
 
 End Sub
 
 
-Public Sub Œ©o‚µ‚ğƒ`ƒFƒbƒN‘I‘ğ‚µ‚Ä”²ˆ(Optional ByVal headerRow As Long = 3)
+Public Sub è¦‹å‡ºã—ã‚’ãƒã‚§ãƒƒã‚¯é¸æŠã—ã¦æŠœç²‹(Optional ByVal headerRow As Long = 3)
     Dim frm As HeaderPicker
     Dim i As Long
 
@@ -1146,44 +1145,44 @@ Public Sub Œ©o‚µ‚ğƒ`ƒFƒbƒN‘I‘ğ‚µ‚Ä”²ˆ(Optional ByVal headerRow As Long = 3)
             Columns(i).Hidden = Not showFlags(i)
         Next
 
-        MsgBox "‘I‘ğ‚µ‚½Œ©o‚µ‚Ì‚İ•\¦‚µ‚Ü‚µ‚½B", vbInformation
+        MsgBox "é¸æŠã—ãŸè¦‹å‡ºã—ã®ã¿è¡¨ç¤ºã—ã¾ã—ãŸã€‚", vbInformation
     End If
 
 Finally:
     On Error Resume Next
-    Unload frm                 ' ‚±‚±‚Å”jŠüiHide‚Ì‚Ü‚Üc‚³‚È‚¢j
+    Unload frm                 ' ã“ã“ã§ç ´æ£„ï¼ˆHideã®ã¾ã¾æ®‹ã•ãªã„ï¼‰
     Set frm = Nothing
     Application.ScreenUpdating = True
 End Sub
 
 
 
-' ‘S—ñÄ•\¦i‚â‚è’¼‚µ—pj
-Public Sub ‘S—ñÄ•\¦()
+' å…¨åˆ—å†è¡¨ç¤ºï¼ˆã‚„ã‚Šç›´ã—ç”¨ï¼‰
+Public Sub å…¨åˆ—å†è¡¨ç¤º()
     Cells.EntireColumn.Hidden = False
-    MsgBox "‚·‚×‚Ä‚Ì—ñ‚ğÄ•\¦‚µ‚Ü‚µ‚½", vbInformation
+    MsgBox "ã™ã¹ã¦ã®åˆ—ã‚’å†è¡¨ç¤ºã—ã¾ã—ãŸ", vbInformation
 End Sub
 
-' ===== ‘O‰ñ‘I‘ğ‚Ì•Û‘¶/“Çi‰B‚µƒV[ƒg‚É‰i‘±‰»j =====
+' ===== å‰å›é¸æŠã®ä¿å­˜/èª­è¾¼ï¼ˆéš ã—ã‚·ãƒ¼ãƒˆã«æ°¸ç¶šåŒ–ï¼‰ =====
 Public Sub SaveLastSelection(sel As Collection)
     Dim ws As Worksheet, i As Long
     Set ws = EnsurePresetSheet()
     ws.Cells.ClearContents
     For i = 1 To sel.Count
-        ws.Cells(1, i).value = CStr(sel(i)) ' 1s–Ú‚É‰¡•À‚Ñ•Û‘¶
+        ws.Cells(1, i).value = CStr(sel(i)) ' 1è¡Œç›®ã«æ¨ªä¸¦ã³ä¿å­˜
     Next
 End Sub
 Public Sub ShowHeaderPicker()
     Dim frm As HeaderPicker
     Set frm = New HeaderPicker
     frm.Init 3
-    frm.Show vbModeless   ' š©ƒ|ƒCƒ“ƒgFvbModeless
+    frm.Show vbModeless   ' â˜…â†ãƒã‚¤ãƒ³ãƒˆï¼švbModeless
 End Sub
-' •W€ƒ‚ƒWƒ…[ƒ‹‚É‹LÚ
+' æ¨™æº–ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«ã«è¨˜è¼‰
 Public Sub OpenHeaderPicker()
     Dim frm As New HeaderPicker
-    frm.Init 3   ' Œ©o‚µs‚ª3s–Ú‚È‚ç
-    frm.Show vbModeless  ' ©Excel‘€ì‚Æ•Às‚Å‚«‚é
+    frm.Init 3   ' è¦‹å‡ºã—è¡ŒãŒ3è¡Œç›®ãªã‚‰
+    frm.Show vbModeless  ' â†Excelæ“ä½œã¨ä¸¦è¡Œã§ãã‚‹
 End Sub
 
 
@@ -1191,7 +1190,7 @@ End Sub
 Public Function LoadLastSelection() As Collection
     Dim ws As Worksheet, lastCol As Long, i As Long
     On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets("”²ˆƒvƒŠƒZƒbƒg")
+    Set ws = ThisWorkbook.Worksheets("æŠœç²‹ãƒ—ãƒªã‚»ãƒƒãƒˆ")
     On Error GoTo 0
     If ws Is Nothing Then Exit Function
 
@@ -1207,33 +1206,33 @@ End Function
 
 Private Function EnsurePresetSheet() As Worksheet
     On Error Resume Next
-    Set EnsurePresetSheet = ThisWorkbook.Worksheets("”²ˆƒvƒŠƒZƒbƒg")
+    Set EnsurePresetSheet = ThisWorkbook.Worksheets("æŠœç²‹ãƒ—ãƒªã‚»ãƒƒãƒˆ")
     On Error GoTo 0
     If EnsurePresetSheet Is Nothing Then
         Set EnsurePresetSheet = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
-        EnsurePresetSheet.name = "”²ˆƒvƒŠƒZƒbƒg"
-        EnsurePresetSheet.Visible = xlSheetVeryHidden ' ì‹ÆÒ‚ÉŒ©‚¹‚È‚¢
+        EnsurePresetSheet.name = "æŠœç²‹ãƒ—ãƒªã‚»ãƒƒãƒˆ"
+        EnsurePresetSheet.Visible = xlSheetVeryHidden ' ä½œæ¥­è€…ã«è¦‹ã›ãªã„
     End If
 End Function
-'================= ’ŠoƒvƒŠƒZƒbƒgi•¡”•Û‘¶—pj =================
+'================= æŠ½å‡ºãƒ—ãƒªã‚»ãƒƒãƒˆï¼ˆè¤‡æ•°ä¿å­˜ç”¨ï¼‰ =================
 
-' ƒV[ƒg‚ğ—pˆÓiA:ƒvƒŠƒZƒbƒg–¼ / B:XV“ú / C`:Œ©o‚µ–¼j
+' ã‚·ãƒ¼ãƒˆã‚’ç”¨æ„ï¼ˆA:ãƒ—ãƒªã‚»ãƒƒãƒˆå / B:æ›´æ–°æ—¥æ™‚ / Cï½:è¦‹å‡ºã—åï¼‰
 Private Function EnsurePresetBank() As Worksheet
     Dim ws As Worksheet
     On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets("’ŠoƒvƒŠƒZƒbƒg")
+    Set ws = ThisWorkbook.Worksheets("æŠ½å‡ºãƒ—ãƒªã‚»ãƒƒãƒˆ")
     On Error GoTo 0
     If ws Is Nothing Then
         Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
-        ws.name = "’ŠoƒvƒŠƒZƒbƒg"
+        ws.name = "æŠ½å‡ºãƒ—ãƒªã‚»ãƒƒãƒˆ"
         ws.Visible = xlSheetVeryHidden
-        ws.Cells(1, 1).value = "ƒvƒŠƒZƒbƒg–¼"
-        ws.Cells(1, 2).value = "XV“ú"
+        ws.Cells(1, 1).value = "ãƒ—ãƒªã‚»ãƒƒãƒˆå"
+        ws.Cells(1, 2).value = "æ›´æ–°æ—¥æ™‚"
     End If
     Set EnsurePresetBank = ws
 End Function
 
-' ƒvƒŠƒZƒbƒg–¼‚Ìs”Ô†‚ğ•Ô‚·iŒ©‚Â‚©‚ç‚È‚¯‚ê‚Î0j
+' ãƒ—ãƒªã‚»ãƒƒãƒˆåã®è¡Œç•ªå·ã‚’è¿”ã™ï¼ˆè¦‹ã¤ã‹ã‚‰ãªã‘ã‚Œã°0ï¼‰
 Private Function Preset_FindRow(ByVal ws As Worksheet, ByVal name As String) As Long
     Dim lastR As Long, r As Long
     lastR = ws.Cells(ws.Rows.Count, 1).End(xlUp).row
@@ -1246,26 +1245,26 @@ Private Function Preset_FindRow(ByVal ws As Worksheet, ByVal name As String) As 
     Preset_FindRow = 0
 End Function
 
-' •Û‘¶i“¯–¼‚ª‚ ‚ê‚Îã‘‚«j
+' ä¿å­˜ï¼ˆåŒåãŒã‚ã‚Œã°ä¸Šæ›¸ãï¼‰
 Public Sub Preset_Save(ByVal presetName As String, ByVal headers As Collection)
     Dim ws As Worksheet: Set ws = EnsurePresetBank()
     Dim r As Long, i As Long
-    If Len(Trim$(presetName)) = 0 Then Err.Raise vbObjectError + 9101, , "ƒvƒŠƒZƒbƒg–¼‚ª‹ó‚Å‚·B"
+    If Len(Trim$(presetName)) = 0 Then Err.Raise vbObjectError + 9101, , "ãƒ—ãƒªã‚»ãƒƒãƒˆåãŒç©ºã§ã™ã€‚"
     r = Preset_FindRow(ws, presetName)
     If r = 0 Then r = ws.Cells(ws.Rows.Count, 1).End(xlUp).row + 1
 
     ws.Cells(r, 1).value = presetName
     ws.Cells(r, 2).value = Now
 
-    ' Šù‘¶‚ÌŒ©o‚µƒZƒ‹‚ğƒNƒŠƒAiC—ñˆÈ~j
+    ' æ—¢å­˜ã®è¦‹å‡ºã—ã‚»ãƒ«ã‚’ã‚¯ãƒªã‚¢ï¼ˆCåˆ—ä»¥é™ï¼‰
     ws.Range(ws.Cells(r, 3), ws.Cells(r, 3 + Application.Max(1, ws.Columns.Count - 3))).ClearContents
 
     For i = 1 To headers.Count
-        ws.Cells(r, 2 + i).value = CStr(headers(i))  ' © ³‹K‰»Ï‚İ–¼‚ğ‚»‚Ì‚Ü‚Ü•Û‘¶
+        ws.Cells(r, 2 + i).value = CStr(headers(i))  ' â† æ­£è¦åŒ–æ¸ˆã¿åã‚’ãã®ã¾ã¾ä¿å­˜
     Next
 End Sub
 
-' “Ç‚İ‚İiŒ©o‚µ–¼ƒRƒŒƒNƒVƒ‡ƒ“‚ğ•Ô‚·j
+' èª­ã¿è¾¼ã¿ï¼ˆè¦‹å‡ºã—åã‚³ãƒ¬ã‚¯ã‚·ãƒ§ãƒ³ã‚’è¿”ã™ï¼‰
 Public Function Preset_Load(ByVal presetName As String) As Collection
     Dim ws As Worksheet: Set ws = EnsurePresetBank()
     Dim r As Long, lastC As Long, i As Long
@@ -1280,7 +1279,7 @@ Public Function Preset_Load(ByVal presetName As String) As Collection
     Set Preset_Load = c
 End Function
 
-' íœi¬Œ÷=truej
+' å‰Šé™¤ï¼ˆæˆåŠŸ=trueï¼‰
 Public Function Preset_Delete(ByVal presetName As String) As Boolean
     Dim ws As Worksheet: Set ws = EnsurePresetBank()
     Dim r As Long: r = Preset_FindRow(ws, presetName)
@@ -1290,7 +1289,7 @@ Public Function Preset_Delete(ByVal presetName As String) As Boolean
     End If
 End Function
 
-' ƒvƒŠƒZƒbƒg–¼ˆê——iCollectionj
+' ãƒ—ãƒªã‚»ãƒƒãƒˆåä¸€è¦§ï¼ˆCollectionï¼‰
 Public Function Preset_ListNames() As Collection
     Dim ws As Worksheet: Set ws = EnsurePresetBank()
     Dim lastR As Long, r As Long
@@ -1303,7 +1302,7 @@ Public Function Preset_ListNames() As Collection
 End Function
 '===============================================================
 
-' ƒtƒ@ƒCƒ‹ˆÚ“®i‘¶İƒ`ƒFƒbƒN‚Â‚«^ã‘‚«‰Âj
+' ãƒ•ã‚¡ã‚¤ãƒ«ç§»å‹•ï¼ˆå­˜åœ¨ãƒã‚§ãƒƒã‚¯ã¤ãï¼ä¸Šæ›¸ãå¯ï¼‰
 Private Sub SafeMove(ByVal src As String, ByVal dst As String)
     On Error Resume Next
     If Len(Dir$(src)) > 0 Then
@@ -1314,4 +1313,3 @@ Private Sub SafeMove(ByVal src As String, ByVal dst As String)
 End Sub
 
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              

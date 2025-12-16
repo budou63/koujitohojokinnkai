@@ -1,59 +1,45 @@
-VERSION 5.00
-Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} HeaderPicker 
-   Caption         =   "HeaderPicker"
-   ClientHeight    =   9348.001
-   ClientLeft      =   -816
-   ClientTop       =   -3384
-   ClientWidth     =   10428
-   OleObjectBlob   =   "HeaderPicker.frx":0000
-End
-Attribute VB_Name = "HeaderPicker"
-Attribute VB_GlobalNameSpace = False
-Attribute VB_Creatable = False
-Attribute VB_PredeclaredId = True
-Attribute VB_Exposed = False
 Option Explicit
 
-'==================== ƒ‚ƒWƒ…[ƒ‹ƒŒƒxƒ‹éŒ¾iÅ‰‚É’u‚­j ====================
-' ŒÄ‚Ño‚µŒ³‚ª“Ç‚ŞƒvƒƒpƒeƒB
+'==================== ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«ãƒ¬ãƒ™ãƒ«å®£è¨€ï¼ˆæœ€åˆã«ç½®ãï¼‰ ====================
+' å‘¼ã³å‡ºã—å…ƒãŒèª­ã‚€ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£
 Public selectedCols As Collection
 Public Canceled As Boolean
 
-' “à•”ó‘Ô
+' å†…éƒ¨çŠ¶æ…‹
 Private headerRowNum As Long
-Private allItems As Variant   ' {•\¦ƒeƒLƒXƒgi’Ê‚µ”Ô†+Œ©o‚µj, —ñ”Ô†, Œ©o‚µ–¼} ‚Ì3—ñ”z—ñ
-Private syncingUI As Boolean  ' šƒeƒLƒXƒg/ƒRƒ“ƒ{‘ŠŒİ“¯Šú‚Ìƒ‹[ƒv–h~
+Private allItems As Variant   ' {è¡¨ç¤ºãƒ†ã‚­ã‚¹ãƒˆï¼ˆé€šã—ç•ªå·+è¦‹å‡ºã—ï¼‰, åˆ—ç•ªå·, è¦‹å‡ºã—å} ã®3åˆ—é…åˆ—
+Private syncingUI As Boolean  ' â˜…ãƒ†ã‚­ã‚¹ãƒˆ/ã‚³ãƒ³ãƒœç›¸äº’åŒæœŸã®ãƒ«ãƒ¼ãƒ—é˜²æ­¢
 '==========================================================================
-' --- ‚±‚±‚©‚ç’Ç‹Li·‚µ‚İ—p‚Ìó‘Ôj ---
-Private WM_TemplatePaths As Collection  ' cboWM_Template ‚Ì•À‚Ñ‚Æ“¯Šú‚·‚éƒtƒ‹ƒpƒXŒQ
-Private Const WM_KEY_HEADER As String = "“]‹L"   ' šƒL[—ñ‚ÍŒÅ’è
+' --- ã“ã“ã‹ã‚‰è¿½è¨˜ï¼ˆå·®ã—è¾¼ã¿ç”¨ã®çŠ¶æ…‹ï¼‰ ---
+Private WM_TemplatePaths As Collection  ' cboWM_Template ã®ä¸¦ã³ã¨åŒæœŸã™ã‚‹ãƒ•ãƒ«ãƒ‘ã‚¹ç¾¤
+Private Const WM_KEY_HEADER As String = "è»¢è¨˜"   ' â˜…ã‚­ãƒ¼åˆ—ã¯å›ºå®š
 
-' i•K—v‚È‚çc‚·jƒtƒH[ƒ€‚Ì‹óƒNƒŠƒbƒNƒCƒxƒ“ƒg
+' ï¼ˆå¿…è¦ãªã‚‰æ®‹ã™ï¼‰ãƒ•ã‚©ãƒ¼ãƒ ã®ç©ºã‚¯ãƒªãƒƒã‚¯ã‚¤ãƒ™ãƒ³ãƒˆ
 Private Sub UserForm_Click()
 End Sub
 
 
-' === ‰Šú‰»iŒÄ‚Ño‚µ‚ÉŒ©o‚µs‚ğó‚¯æ‚éj ===
+' === åˆæœŸåŒ–ï¼ˆå‘¼ã³å‡ºã—æ™‚ã«è¦‹å‡ºã—è¡Œã‚’å—ã‘å–ã‚‹ï¼‰ ===
 Public Sub Init(ByVal headerRow As Long)
     headerRowNum = headerRow
     Me.Canceled = True
 
-    LoadHeaders                 ' Às‚Éí‚ÉÅV‚ğ“Ç‚İ‚Ş
+    LoadHeaders                 ' å®Ÿè¡Œæ™‚ã«å¸¸ã«æœ€æ–°ã‚’èª­ã¿è¾¼ã‚€
     txtFilter.Text = ""
 
-    ' šƒvƒŠƒZƒbƒg–¼‚Ìˆê——‚ğ“Ç‚İ‚Ş
+    ' â˜…ãƒ—ãƒªã‚»ãƒƒãƒˆåã®ä¸€è¦§ã‚’èª­ã¿è¾¼ã‚€
     LoadPresetNamesToCombo
 
 
-    ' ‘O‰ñ‘I‘ğ‚ğ•œŒ³i‘¶İ‚·‚éŒ©o‚µ‚Ì‚İj
+    ' å‰å›é¸æŠã‚’å¾©å…ƒï¼ˆå­˜åœ¨ã™ã‚‹è¦‹å‡ºã—ã®ã¿ï¼‰
     Dim last As Collection, i As Long, j As Long, nm As String
-    Set last = LoadLastSelection()   ' © •W€ƒ‚ƒWƒ…[ƒ‹‘¤‚ÌŠÖ”‚ğ—˜—p
+    Set last = LoadLastSelection()   ' â† æ¨™æº–ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«å´ã®é–¢æ•°ã‚’åˆ©ç”¨
 
     If Not last Is Nothing Then
         For i = 0 To lstHeaders.ListCount - 1
             nm = CStr(lstHeaders.List(i, 2))
             For j = 1 To last.Count
-                If ³‹K‰»(nm) = ³‹K‰»(CStr(last(j))) Then
+                If æ­£è¦åŒ–(nm) = æ­£è¦åŒ–(CStr(last(j))) Then
                     lstHeaders.Selected(i) = True
                     Exit For
                 End If
@@ -61,17 +47,17 @@ Public Sub Init(ByVal headerRow As Long)
         Next
     End If
 
-    ' š·‚µ‚İUI‚Ì‰Šú‰»i’è‹`‚ÍƒtƒH[ƒ€––”ö‚É1‚Â‚¾‚¯j
+    ' â˜…å·®ã—è¾¼ã¿UIã®åˆæœŸåŒ–ï¼ˆå®šç¾©ã¯ãƒ•ã‚©ãƒ¼ãƒ æœ«å°¾ã«1ã¤ã ã‘ï¼‰
     InitWordMergeUI
 
 End Sub
 
 
 
-' === Œ©o‚µ—ñ‚ğ“Ç‚İ‚ŞiheaderRowNum ‚Ìsj ===
+' === è¦‹å‡ºã—åˆ—ã‚’èª­ã¿è¾¼ã‚€ï¼ˆheaderRowNum ã®è¡Œï¼‰ ===
 Private Sub LoadHeaders()
     Dim ws As Worksheet
-    Set ws = ThisWorkbook.Worksheets("•\")
+    Set ws = ThisWorkbook.Worksheets("è¡¨")
 
     Dim lastCol As Long, i As Long
     Dim nm As String, disp As String, serial As String
@@ -79,7 +65,7 @@ Private Sub LoadHeaders()
 
     lastCol = ws.Cells(headerRowNum, ws.Columns.Count).End(xlToLeft).Column
     For i = 1 To lastCol
-        nm = ³‹K‰»(CStr(ws.Cells(headerRowNum, i).value))
+        nm = æ­£è¦åŒ–(CStr(ws.Cells(headerRowNum, i).value))
         serial = Trim$(CStr(ws.Cells(1, i).value))
 
         If Len(nm) > 0 Then
@@ -110,7 +96,7 @@ End Sub
 
 
 
-' === ƒtƒBƒ‹ƒ^“K—p ===
+' === ãƒ•ã‚£ãƒ«ã‚¿é©ç”¨ ===
 Private Sub ApplyFilter(ByVal key As String)
     Dim i As Long, n As Long
     Dim buf() As Variant, outArr() As Variant
@@ -153,9 +139,9 @@ End Sub
 
 
 
-' === ƒRƒ“ƒgƒ[ƒ‹ƒCƒxƒ“ƒg ===
+' === ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ«ã‚¤ãƒ™ãƒ³ãƒˆ ===
 Private Sub txtFilter_Change()
-    ApplyFilter ³‹K‰»(txtFilter.Text)
+    ApplyFilter æ­£è¦åŒ–(txtFilter.Text)
 End Sub
 
 Private Sub cmdAll_Click()
@@ -178,28 +164,28 @@ Private Sub cmdInvert_Click()
         lstHeaders.Selected(i) = Not lstHeaders.Selected(i)
     Next
 End Sub
-' ‘S—ñÄ•\¦ƒ{ƒ^ƒ“
+' å…¨åˆ—å†è¡¨ç¤ºãƒœã‚¿ãƒ³
 Private Sub cmdShowAll_Click()
-    ThisWorkbook.Worksheets("•\").Cells.EntireColumn.Hidden = False
-    MsgBox "‚·‚×‚Ä‚Ì—ñ‚ğÄ•\¦‚µ‚Ü‚µ‚½", vbInformation
+    ThisWorkbook.Worksheets("è¡¨").Cells.EntireColumn.Hidden = False
+    MsgBox "ã™ã¹ã¦ã®åˆ—ã‚’å†è¡¨ç¤ºã—ã¾ã—ãŸ", vbInformation
 End Sub
 
 
 
-' ”²ˆÀsiOKƒ{ƒ^ƒ“j? ƒtƒH[ƒ€‚Í•Â‚¶‚È‚¢
+' æŠœç²‹å®Ÿè¡Œï¼ˆOKãƒœã‚¿ãƒ³ï¼‰? ãƒ•ã‚©ãƒ¼ãƒ ã¯é–‰ã˜ãªã„
 Private Sub cmdOK_Click()
     Dim ws As Worksheet
     Dim i As Long, lastCol As Long
     Dim showFlags() As Boolean
-    Dim selColsLocal As New Collection      ' šƒ[ƒJƒ‹–¼‚É•ÏXiƒVƒƒƒh[ƒCƒ“ƒO‰ñ”ğj
+    Dim selColsLocal As New Collection      ' â˜…ãƒ­ãƒ¼ã‚«ãƒ«åã«å¤‰æ›´ï¼ˆã‚·ãƒ£ãƒ‰ãƒ¼ã‚¤ãƒ³ã‚°å›é¿ï¼‰
     Dim selectedNames As New Collection
 
-    Set ws = ThisWorkbook.Worksheets("•\")  ' ‘ÎÛƒV[ƒg
+    Set ws = ThisWorkbook.Worksheets("è¡¨")  ' å¯¾è±¡ã‚·ãƒ¼ãƒˆ
 
-    ' Œ©o‚µ–¢€”õ‚È‚çˆê‰ƒ[ƒh
+    ' è¦‹å‡ºã—æœªæº–å‚™ãªã‚‰ä¸€å¿œãƒ­ãƒ¼ãƒ‰
     If IsEmpty(allItems) Then LoadHeaders
 
-    ' ListBox ‚Ì‘I‘ğ‚ğûWi0—ñ–Ú=•\¦ƒeƒLƒXƒg, 1—ñ–Ú=—ñ”Ô†, 2—ñ–Ú=Œ©o‚µ–¼j
+    ' ListBox ã®é¸æŠã‚’åé›†ï¼ˆ0åˆ—ç›®=è¡¨ç¤ºãƒ†ã‚­ã‚¹ãƒˆ, 1åˆ—ç›®=åˆ—ç•ªå·, 2åˆ—ç›®=è¦‹å‡ºã—åï¼‰
     For i = 0 To lstHeaders.ListCount - 1
         If lstHeaders.Selected(i) Then
             selColsLocal.Add CLng(lstHeaders.List(i, 1))
@@ -208,14 +194,14 @@ Private Sub cmdOK_Click()
     Next
 
     If selColsLocal.Count = 0 Then
-        MsgBox "”²ˆ‚·‚éŒ©o‚µ‚ª‘I‚Î‚ê‚Ä‚¢‚Ü‚¹‚ñB", vbExclamation
+        MsgBox "æŠœç²‹ã™ã‚‹è¦‹å‡ºã—ãŒé¸ã°ã‚Œã¦ã„ã¾ã›ã‚“ã€‚", vbExclamation
         Exit Sub
     End If
 
-    ' Ÿ‰ñ•œŒ³‚Ì‚½‚ß‚É‘I‘ğ–¼‚ğ•Û‘¶
+    ' æ¬¡å›å¾©å…ƒã®ãŸã‚ã«é¸æŠåã‚’ä¿å­˜
     SaveLastSelection selectedNames
 
-    ' ”²ˆi‘S—ñ•\¦¨‘I‘ğˆÈŠO‚ğ”ñ•\¦j
+    ' æŠœç²‹ï¼ˆå…¨åˆ—è¡¨ç¤ºâ†’é¸æŠä»¥å¤–ã‚’éè¡¨ç¤ºï¼‰
     Application.ScreenUpdating = False
     ws.Cells.EntireColumn.Hidden = False
 
@@ -230,27 +216,27 @@ Private Sub cmdOK_Click()
 
     Application.ScreenUpdating = True
 
-    ' š‚±‚±‚ÅƒtƒH[ƒ€‚Ìƒ‚ƒWƒ…[ƒ‹ƒŒƒxƒ‹•Ï”‚Ö”½‰f
+    ' â˜…ã“ã“ã§ãƒ•ã‚©ãƒ¼ãƒ ã®ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«ãƒ¬ãƒ™ãƒ«å¤‰æ•°ã¸åæ˜ 
     Set Me.selectedCols = selColsLocal
 
-    ' ƒtƒH[ƒ€‚Í•Â‚¶‚È‚¢i‚»‚Ì‚Ü‚ÜŸ‚Ì‘€ì‚ª‚Å‚«‚éj
+    ' ãƒ•ã‚©ãƒ¼ãƒ ã¯é–‰ã˜ãªã„ï¼ˆãã®ã¾ã¾æ¬¡ã®æ“ä½œãŒã§ãã‚‹ï¼‰
     Me.Canceled = False
-    'MsgBox "‘I‘ğ‚µ‚½Œ©o‚µ‚Ì‚İ•\¦‚µ‚Ü‚µ‚½B", vbInformation
+    'MsgBox "é¸æŠã—ãŸè¦‹å‡ºã—ã®ã¿è¡¨ç¤ºã—ã¾ã—ãŸã€‚", vbInformation
 End Sub
 Private Sub cmdCancel_Click()
-    ' ƒLƒƒƒ“ƒZƒ‹FSelectedCols ‚Í Nothing ‚Ì‚Ü‚ÜiŒÄ‚Ño‚µ‘¤‚Å”»’èj
+    ' ã‚­ãƒ£ãƒ³ã‚»ãƒ«æ™‚ï¼šSelectedCols ã¯ Nothing ã®ã¾ã¾ï¼ˆå‘¼ã³å‡ºã—å´ã§åˆ¤å®šï¼‰
     Me.Canceled = True
     Me.Hide
 End Sub
-' ~‚Å•Â‚¶‚½‚Æ‚«‚ÍuƒLƒƒƒ“ƒZƒ‹ˆµ‚¢v‚É‚µ‚Ä Unload ‚³‚¹‚È‚¢
+' Ã—ã§é–‰ã˜ãŸã¨ãã¯ã€Œã‚­ãƒ£ãƒ³ã‚»ãƒ«æ‰±ã„ã€ã«ã—ã¦ Unload ã•ã›ãªã„
 Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
-    If CloseMode = 0 Then            ' ƒ†[ƒU[‚ª~‚ğ‰Ÿ‚µ‚½
-        Me.Canceled = True           ' ŒÄ‚Ño‚µŒ³‚ª”»’è‚Å‚«‚é‚æ‚¤‚É
-        Me.Hide                      ' ‚¢‚Á‚½‚ñ‰B‚·iUnload‚µ‚È‚¢j
-        Cancel = True                ' Unload ‚ğƒLƒƒƒ“ƒZƒ‹
+    If CloseMode = 0 Then            ' ãƒ¦ãƒ¼ã‚¶ãƒ¼ãŒÃ—ã‚’æŠ¼ã—ãŸ
+        Me.Canceled = True           ' å‘¼ã³å‡ºã—å…ƒãŒåˆ¤å®šã§ãã‚‹ã‚ˆã†ã«
+        Me.Hide                      ' ã„ã£ãŸã‚“éš ã™ï¼ˆUnloadã—ãªã„ï¼‰
+        Cancel = True                ' Unload ã‚’ã‚­ãƒ£ãƒ³ã‚»ãƒ«
     End If
 End Sub
-'=== ƒvƒŠƒZƒbƒg–¼‚Ì“¯ŠúiƒeƒLƒXƒg ¨ ƒRƒ“ƒ{j ===
+'=== ãƒ—ãƒªã‚»ãƒƒãƒˆåã®åŒæœŸï¼ˆãƒ†ã‚­ã‚¹ãƒˆ â†’ ã‚³ãƒ³ãƒœï¼‰ ===
 Private Sub txtPresetName_Change()
     If syncingUI Then Exit Sub
     syncingUI = True
@@ -268,54 +254,54 @@ Private Sub cboPreset_Change()
     syncingUI = False
 End Sub
 Private Sub CommandButton1_Click()
-    ' •W€ƒ‚ƒWƒ…[ƒ‹‚Ìƒ}ƒNƒ‚ğŒÄ‚Ño‚·
-    Call Œ‹‡CSVo—Í
+    ' æ¨™æº–ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«ã®ãƒã‚¯ãƒ­ã‚’å‘¼ã³å‡ºã™
+    Call çµåˆCSVå‡ºåŠ›
 End Sub
 Private Sub CommandButton2_Click()
-    ' •W€ƒ‚ƒWƒ…[ƒ‹‚Ìƒ}ƒNƒ‚ğŒÄ‚Ño‚·
-    Call Œ»ƒo[ƒWƒ‡ƒ“•Û‘¶
+    ' æ¨™æº–ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«ã®ãƒã‚¯ãƒ­ã‚’å‘¼ã³å‡ºã™
+    Call ç¾ãƒãƒ¼ã‚¸ãƒ§ãƒ³ä¿å­˜
 End Sub
 Private Sub CommandButton3_Click()
-    ' •W€ƒ‚ƒWƒ…[ƒ‹‚Ìƒ}ƒNƒ‚ğŒÄ‚Ño‚·
-    Call ‰È–Ú•Ê–‹Æ•ÊÎoˆê——•ÒW
+    ' æ¨™æº–ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«ã®ãƒã‚¯ãƒ­ã‚’å‘¼ã³å‡ºã™
+    Call ç§‘ç›®åˆ¥äº‹æ¥­åˆ¥æ­³å‡ºä¸€è¦§ç·¨é›†
 End Sub
 Private Sub CommandButton4_Click()
-    ' •W€ƒ‚ƒWƒ…[ƒ‹‚Ìƒ}ƒNƒ‚ğŒÄ‚Ño‚·
-    Call —\ZŠz‚ğ•\‚É“]Ê
+    ' æ¨™æº–ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«ã®ãƒã‚¯ãƒ­ã‚’å‘¼ã³å‡ºã™
+    Call äºˆç®—é¡ã‚’è¡¨ã«è»¢å†™
 End Sub
 Private Sub CommandButton5_Click()
-    ' •W€ƒ‚ƒWƒ…[ƒ‹‚Ìƒ}ƒNƒ‚ğŒÄ‚Ño‚·
-    Call A—ñ‚É‹àŠzî•ñ‚ğƒRƒƒ“ƒg•\¦
+    ' æ¨™æº–ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«ã®ãƒã‚¯ãƒ­ã‚’å‘¼ã³å‡ºã™
+    Call Aåˆ—ã«é‡‘é¡æƒ…å ±ã‚’ã‚³ãƒ¡ãƒ³ãƒˆè¡¨ç¤º
 End Sub
 
 
 Private Sub UserForm_Initialize()
-    ' ƒTƒCƒYŒÅ’è‚µ‚½‚¢‚È‚ç‚±‚±‚Åw’èi”CˆÓj
+    ' ã‚µã‚¤ã‚ºå›ºå®šã—ãŸã„ãªã‚‰ã“ã“ã§æŒ‡å®šï¼ˆä»»æ„ï¼‰
     Me.Width = 600
     Me.Height = 610
 
-    ' ˆÊ’u‚Íè“®‚É‚µ‚Ä‚©‚ç’†‰›‚Ö
+    ' ä½ç½®ã¯æ‰‹å‹•ã«ã—ã¦ã‹ã‚‰ä¸­å¤®ã¸
     Me.StartUpPosition = 0
     Me.Left = Application.Left + (Application.Width - Me.Width) / 2
     Me.Top = Application.Top + (Application.Height - Me.Height) / 2
 End Sub
 
 
-' === Œ©o‚µ‚Ì³‹K‰»F‰üs/‘SŠp‹ó”’/‘SŠpƒJƒbƒR/˜A‘±‹ó”’‚ğ‹zû ===
-Private Function ³‹K‰»(ByVal s As String) As String
+' === è¦‹å‡ºã—ã®æ­£è¦åŒ–ï¼šæ”¹è¡Œ/å…¨è§’ç©ºç™½/å…¨è§’ã‚«ãƒƒã‚³/é€£ç¶šç©ºç™½ã‚’å¸å ===
+Private Function æ­£è¦åŒ–(ByVal s As String) As String
     s = Replace$(s, vbCr, "")
     s = Replace$(s, vbLf, "")
     s = Trim$(s)
-    s = Replace$(s, "@", " ")
-    s = Replace$(s, "i", "(")
-    s = Replace$(s, "j", ")")
+    s = Replace$(s, "ã€€", " ")
+    s = Replace$(s, "ï¼ˆ", "(")
+    s = Replace$(s, "ï¼‰", ")")
     Do While InStr(s, "  ") > 0
         s = Replace$(s, "  ", " ")
     Loop
-    ³‹K‰» = s
+    æ­£è¦åŒ– = s
 End Function
 
-'=== ‘I‘ğƒRƒŒƒNƒVƒ‡ƒ“‚ÌˆÀ‘S‚ÈƒQƒbƒ^[iƒLƒƒƒ“ƒZƒ‹‚Í Nothing ‚ğ•Ô‚·j ===
+'=== é¸æŠã‚³ãƒ¬ã‚¯ã‚·ãƒ§ãƒ³ã®å®‰å…¨ãªã‚²ãƒƒã‚¿ãƒ¼ï¼ˆã‚­ãƒ£ãƒ³ã‚»ãƒ«æ™‚ã¯ Nothing ã‚’è¿”ã™ï¼‰ ===
 Public Property Get SelectedColsSafe() As Collection
     If selectedCols Is Nothing Then
         Set SelectedColsSafe = Nothing
@@ -323,7 +309,7 @@ Public Property Get SelectedColsSafe() As Collection
         Set SelectedColsSafe = selectedCols
     End If
 End Property
-' === ƒvƒŠƒZƒbƒg–¼ˆê——‚ğƒRƒ“ƒ{‚É“Ç‚İ‚Şi‘I‘ğ•Ûj ===
+' === ãƒ—ãƒªã‚»ãƒƒãƒˆåä¸€è¦§ã‚’ã‚³ãƒ³ãƒœã«èª­ã¿è¾¼ã‚€ï¼ˆé¸æŠä¿æŒï¼‰ ===
 Private Sub LoadPresetNamesToCombo()
     Dim prev As String, lst As Collection, i As Long, found As Boolean
     On Error Resume Next
@@ -332,7 +318,7 @@ Private Sub LoadPresetNamesToCombo()
 
     Me.cboPreset.Clear
 
-    Set lst = Preset_ListNames()          ' © Module1 ‚ÌŠÖ”
+    Set lst = Preset_ListNames()          ' â† Module1 ã®é–¢æ•°
     If Not lst Is Nothing Then
         For i = 1 To lst.Count
             Me.cboPreset.AddItem lst(i)
@@ -348,112 +334,112 @@ Private Sub LoadPresetNamesToCombo()
 End Sub
 
 
-' === ƒvƒŠƒZƒbƒg•Û‘¶i“¯–¼‚Íã‘‚«j ===        ©‚±‚±‚©‚ç“\‚è‘Ö‚¦
+' === ãƒ—ãƒªã‚»ãƒƒãƒˆä¿å­˜ï¼ˆåŒåã¯ä¸Šæ›¸ãï¼‰ ===        â†ã“ã“ã‹ã‚‰è²¼ã‚Šæ›¿ãˆ
 Private Sub btnPresetSave_Click()
     Dim i As Long
     Dim selNames As New Collection
     Dim nm As String
 
-    ' Œ»İ‚Ì‘I‘ğŒ©o‚µ‚ğûW
+    ' ç¾åœ¨ã®é¸æŠè¦‹å‡ºã—ã‚’åé›†
     For i = 0 To lstHeaders.ListCount - 1
         If lstHeaders.Selected(i) Then selNames.Add CStr(lstHeaders.List(i, 2))
     Next
     If selNames.Count = 0 Then
-        MsgBox "•Û‘¶‚·‚éŒ©o‚µ‚ª‘I‚Î‚ê‚Ä‚¢‚Ü‚¹‚ñB", vbExclamation
+        MsgBox "ä¿å­˜ã™ã‚‹è¦‹å‡ºã—ãŒé¸ã°ã‚Œã¦ã„ã¾ã›ã‚“ã€‚", vbExclamation
         Exit Sub
     End If
 
-    ' ƒeƒLƒXƒg ¨ ƒRƒ“ƒ{ ¨ InputBox ‚Ì‡‚Å–¼‘O‚ğæ“¾
+    ' ãƒ†ã‚­ã‚¹ãƒˆ â†’ ã‚³ãƒ³ãƒœ â†’ InputBox ã®é †ã§åå‰ã‚’å–å¾—
     nm = Trim$(Me.txtPresetName.Text)
     If nm = "" Then nm = Trim$(CStr(Me.cboPreset.value))
-    If nm = "" Then nm = Trim$(InputBox("ƒvƒŠƒZƒbƒg–¼‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢", "ƒvƒŠƒZƒbƒg•Û‘¶"))
+    If nm = "" Then nm = Trim$(InputBox("ãƒ—ãƒªã‚»ãƒƒãƒˆåã‚’å…¥åŠ›ã—ã¦ãã ã•ã„", "ãƒ—ãƒªã‚»ãƒƒãƒˆä¿å­˜"))
     If nm = "" Then
-        MsgBox "ƒvƒŠƒZƒbƒg–¼‚ª–¢“ü—Í‚Å‚·B", vbExclamation
+        MsgBox "ãƒ—ãƒªã‚»ãƒƒãƒˆåãŒæœªå…¥åŠ›ã§ã™ã€‚", vbExclamation
         Exit Sub
     End If
 
-    ' •Û‘¶i“¯–¼‚Íã‘‚«j
+    ' ä¿å­˜ï¼ˆåŒåã¯ä¸Šæ›¸ãï¼‰
     Preset_Save nm, selNames
 
- ' š•Û‘¶’¼Œã‚ÉƒRƒ“ƒ{‚Ìˆê——‚ğƒŠƒ[ƒh
+ ' â˜…ä¿å­˜ç›´å¾Œã«ã‚³ãƒ³ãƒœã®ä¸€è¦§ã‚’ãƒªãƒ­ãƒ¼ãƒ‰
     LoadPresetNamesToCombo
 
-    ' UI ‚ğ“¯Šú
+    ' UI ã‚’åŒæœŸ
     Me.cboPreset.value = nm
     Me.txtPresetName.Text = nm
 
-    MsgBox "ƒvƒŠƒZƒbƒgu" & nm & "v‚ğ•Û‘¶‚µ‚Ü‚µ‚½B", vbInformation
+    MsgBox "ãƒ—ãƒªã‚»ãƒƒãƒˆã€Œ" & nm & "ã€ã‚’ä¿å­˜ã—ã¾ã—ãŸã€‚", vbInformation
 End Sub
 
-' === ƒvƒŠƒZƒbƒgŒÄ‚Ño‚µi‘I‘ğó‘Ô‚ğ•œŒ³j ===    ' ©‚±‚±‚©‚ç’uŠ·
+' === ãƒ—ãƒªã‚»ãƒƒãƒˆå‘¼ã³å‡ºã—ï¼ˆé¸æŠçŠ¶æ…‹ã‚’å¾©å…ƒï¼‰ ===    ' â†ã“ã“ã‹ã‚‰ç½®æ›
 Private Sub btnPresetLoad_Click()
     Dim nm As String
     Dim lst As Collection, i As Long, j As Long, Target As String
 
-    ' 1) ƒRƒ“ƒ{‚Ìu‘I‘ğ’†‚Ì€–Úv‚ğÅ—Dæ‚Åæ“¾
+    ' 1) ã‚³ãƒ³ãƒœã®ã€Œé¸æŠä¸­ã®é …ç›®ã€ã‚’æœ€å„ªå…ˆã§å–å¾—
     If Me.cboPreset.ListIndex >= 0 Then
         nm = CStr(Me.cboPreset.List(Me.cboPreset.ListIndex))
     Else
-        nm = Trim$(Me.txtPresetName.Text)   ' –¢‘I‘ğ‚È‚çƒeƒLƒXƒg‚©‚ç
+        nm = Trim$(Me.txtPresetName.Text)   ' æœªé¸æŠãªã‚‰ãƒ†ã‚­ã‚¹ãƒˆã‹ã‚‰
     End If
     If nm = "" Then
-        MsgBox "ŒÄ‚Ño‚·ƒvƒŠƒZƒbƒg–¼‚ğ‘I‘ği‚Ü‚½‚Í“ü—Íj‚µ‚Ä‚­‚¾‚³‚¢B", vbExclamation
+        MsgBox "å‘¼ã³å‡ºã™ãƒ—ãƒªã‚»ãƒƒãƒˆåã‚’é¸æŠï¼ˆã¾ãŸã¯å…¥åŠ›ï¼‰ã—ã¦ãã ã•ã„ã€‚", vbExclamation
         Exit Sub
     End If
 
-    ' 2) “Ç‚İ‚İ
+    ' 2) èª­ã¿è¾¼ã¿
     Set lst = Preset_Load(nm)
     If lst Is Nothing Or lst.Count = 0 Then
-        MsgBox "ƒvƒŠƒZƒbƒgu" & nm & "v‚ªŒ©‚Â‚©‚ç‚È‚¢‚©A“à—e‚ª‹ó‚Å‚·B", vbExclamation
+        MsgBox "ãƒ—ãƒªã‚»ãƒƒãƒˆã€Œ" & nm & "ã€ãŒè¦‹ã¤ã‹ã‚‰ãªã„ã‹ã€å†…å®¹ãŒç©ºã§ã™ã€‚", vbExclamation
         Exit Sub
     End If
 
-    ' 3) ˆê’U‘S‰ğœ ¨ ˆê’v‚·‚éŒ©o‚µ‚ğ‘I‘ğ
+    ' 3) ä¸€æ—¦å…¨è§£é™¤ â†’ ä¸€è‡´ã™ã‚‹è¦‹å‡ºã—ã‚’é¸æŠ
     For i = 0 To lstHeaders.ListCount - 1
         lstHeaders.Selected(i) = False
     Next
     For j = 1 To lst.Count
-        Target = ³‹K‰»(CStr(lst(j)))
+        Target = æ­£è¦åŒ–(CStr(lst(j)))
         For i = 0 To lstHeaders.ListCount - 1
-            If ³‹K‰»(CStr(lstHeaders.List(i, 2))) = Target Then
+            If æ­£è¦åŒ–(CStr(lstHeaders.List(i, 2))) = Target Then
                 lstHeaders.Selected(i) = True
                 Exit For
             End If
         Next
     Next
 
-    ' 4) UI “¯Šúi—¼•û‚É“¯‚¶–¼‘O‚ğ”½‰fj
+    ' 4) UI åŒæœŸï¼ˆä¸¡æ–¹ã«åŒã˜åå‰ã‚’åæ˜ ï¼‰
     Me.cboPreset.value = nm
     Me.txtPresetName.Text = nm
 
-    MsgBox "ƒvƒŠƒZƒbƒgu" & nm & "v‚ğŒÄ‚Ño‚µ‚Ü‚µ‚½B", vbInformation
+    MsgBox "ãƒ—ãƒªã‚»ãƒƒãƒˆã€Œ" & nm & "ã€ã‚’å‘¼ã³å‡ºã—ã¾ã—ãŸã€‚", vbInformation
 End Sub
 
 
-' === ƒvƒŠƒZƒbƒgíœ ===
+' === ãƒ—ãƒªã‚»ãƒƒãƒˆå‰Šé™¤ ===
 Private Sub btnPresetDelete_Click()
     Dim nm As String
     nm = Trim$(CStr(cboPreset.value))
     If nm = "" Then
-        MsgBox "íœ‚·‚éƒvƒŠƒZƒbƒg–¼‚ğ‘I‘ğ‚µ‚Ä‚­‚¾‚³‚¢B", vbExclamation
+        MsgBox "å‰Šé™¤ã™ã‚‹ãƒ—ãƒªã‚»ãƒƒãƒˆåã‚’é¸æŠã—ã¦ãã ã•ã„ã€‚", vbExclamation
         Exit Sub
     End If
 
-    If MsgBox("ƒvƒŠƒZƒbƒgu" & nm & "v‚ğíœ‚µ‚Ü‚·B‚æ‚ë‚µ‚¢‚Å‚·‚©H", vbExclamation + vbOKCancel) = vbOK Then
+    If MsgBox("ãƒ—ãƒªã‚»ãƒƒãƒˆã€Œ" & nm & "ã€ã‚’å‰Šé™¤ã—ã¾ã™ã€‚ã‚ˆã‚ã—ã„ã§ã™ã‹ï¼Ÿ", vbExclamation + vbOKCancel) = vbOK Then
         If Preset_Delete(nm) Then
             LoadPresetNamesToCombo
             cboPreset.value = ""
             On Error Resume Next
             If Not txtPresetName Is Nothing Then txtPresetName.Text = ""
             On Error GoTo 0
-            MsgBox "íœ‚µ‚Ü‚µ‚½B", vbInformation
+            MsgBox "å‰Šé™¤ã—ã¾ã—ãŸã€‚", vbInformation
         Else
-            MsgBox "íœ‚É¸”s‚µ‚Ü‚µ‚½B", vbExclamation
+            MsgBox "å‰Šé™¤ã«å¤±æ•—ã—ã¾ã—ãŸã€‚", vbExclamation
         End If
     End If
 End Sub
 '========================================
-' ·‚µ‚İUI ‰Šú‰»iƒtƒHƒ‹ƒ_•\¦{ƒeƒ“ƒvƒŒˆê——“Ç{ƒwƒbƒ_“Ç‚İ‚İj
+' å·®ã—è¾¼ã¿UI åˆæœŸåŒ–ï¼ˆãƒ•ã‚©ãƒ«ãƒ€è¡¨ç¤ºï¼‹ãƒ†ãƒ³ãƒ—ãƒ¬ä¸€è¦§èª­è¾¼ï¼‹ãƒ˜ãƒƒãƒ€èª­ã¿è¾¼ã¿ï¼‰
 '========================================
 Private Sub InitWordMergeUI()
     On Error Resume Next
@@ -462,9 +448,9 @@ Private Sub InitWordMergeUI()
 
     WM_LoadTemplatesToCombo
 
-    ' Šù’èƒL[’liA2j‚ğu•\v‚©‚çæ“¾
+    ' æ—¢å®šã‚­ãƒ¼å€¤ï¼ˆA2ï¼‰ã‚’ã€Œè¡¨ã€ã‹ã‚‰å–å¾—
     Dim ws As Worksheet
-    Set ws = ThisWorkbook.Worksheets("•\")
+    Set ws = ThisWorkbook.Worksheets("è¡¨")
     On Error Resume Next
     Me.txtWM_KeyValue.Text = CStr(ws.Range("A2").value)
     On Error GoTo 0
@@ -472,13 +458,13 @@ End Sub
 
 
 '========================================
-' ƒeƒ“ƒvƒŒˆê——‚ğƒRƒ“ƒ{‚É“Ç‚İ‚ŞiÄ“Ç‚à‚±‚ê‚ğŒÄ‚Ôj
+' ãƒ†ãƒ³ãƒ—ãƒ¬ä¸€è¦§ã‚’ã‚³ãƒ³ãƒœã«èª­ã¿è¾¼ã‚€ï¼ˆå†èª­è¾¼ã‚‚ã“ã‚Œã‚’å‘¼ã¶ï¼‰
 '========================================
 Private Sub WM_LoadTemplatesToCombo()
     Dim col As Collection, i As Long, p As String
     Dim keep As String, found As Boolean
 
-    ' ’¼‘O‚Ì‘I‘ğ‚ğ•ÛiÄ“ÇŒã‚É•œŒ³j
+    ' ç›´å‰ã®é¸æŠã‚’ä¿æŒï¼ˆå†èª­è¾¼å¾Œã«å¾©å…ƒï¼‰
     On Error Resume Next
     keep = Me.cboWM_Template.value
     On Error GoTo 0
@@ -486,21 +472,21 @@ Private Sub WM_LoadTemplatesToCombo()
     Set WM_TemplatePaths = New Collection
     Me.cboWM_Template.Clear
 
-    ' i”CˆÓjƒtƒHƒ‹ƒ_•\¦‚Ìƒ‰ƒxƒ‹‚ª‚ ‚éê‡‚ÍXV
+    ' ï¼ˆä»»æ„ï¼‰ãƒ•ã‚©ãƒ«ãƒ€è¡¨ç¤ºã®ãƒ©ãƒ™ãƒ«ãŒã‚ã‚‹å ´åˆã¯æ›´æ–°
     On Error Resume Next
     Me.lblWM_Folder.Caption = modWordMerge.WM_TemplateDir()
     On Error GoTo 0
 
-    ' ˆê——‚ğæ“¾‚µ‚Ä—¬‚µ‚Ş
+    ' ä¸€è¦§ã‚’å–å¾—ã—ã¦æµã—è¾¼ã‚€
     Set col = modWordMerge.WM_ListTemplates()
     If Not col Is Nothing And col.Count > 0 Then
         For i = 1 To col.Count
-            p = CStr(col(i))                              ' ƒtƒ‹ƒpƒX
+            p = CStr(col(i))                              ' ãƒ•ãƒ«ãƒ‘ã‚¹
             WM_TemplatePaths.Add p
-            Me.cboWM_Template.AddItem modWordMerge.WM_GetBaseName(p)  ' •\¦‚Íƒtƒ@ƒCƒ‹–¼
+            Me.cboWM_Template.AddItem modWordMerge.WM_GetBaseName(p)  ' è¡¨ç¤ºã¯ãƒ•ã‚¡ã‚¤ãƒ«å
         Next
 
-        ' ’¼‘O‚Ì‘I‘ğ‚ğ‚Å‚«‚é‚¾‚¯•œŒ³
+        ' ç›´å‰ã®é¸æŠã‚’ã§ãã‚‹ã ã‘å¾©å…ƒ
         If keep <> "" Then
             For i = 0 To Me.cboWM_Template.ListCount - 1
                 If StrComp(Me.cboWM_Template.List(i), keep, vbTextCompare) = 0 Then
@@ -512,7 +498,7 @@ Private Sub WM_LoadTemplatesToCombo()
         End If
         If Not found Then Me.cboWM_Template.ListIndex = 0
     Else
-        Me.cboWM_Template.AddItem "idocx/docm ‚ª‚ ‚è‚Ü‚¹‚ñj"
+        Me.cboWM_Template.AddItem "ï¼ˆdocx/docm ãŒã‚ã‚Šã¾ã›ã‚“ï¼‰"
         Me.cboWM_Template.ListIndex = 0
     End If
 End Sub
@@ -525,13 +511,13 @@ Private Sub btnWM_Refresh_Click()
     WM_LoadTemplatesToCombo
 End Sub
 
-' ƒvƒ‹ƒ_ƒEƒ“‚ğŠJ‚­‚½‚Ñ‚ÉÅV‰»‚µ‚½‚¢ê‡i”CˆÓj
+' ãƒ—ãƒ«ãƒ€ã‚¦ãƒ³ã‚’é–‹ããŸã³ã«æœ€æ–°åŒ–ã—ãŸã„å ´åˆï¼ˆä»»æ„ï¼‰
 Private Sub cboWM_Template_DropButtonClick()
     WM_LoadTemplatesToCombo
 End Sub
 
 '========================================
-' ‘I‘ğ‚³‚ê‚½ƒeƒ“ƒvƒŒ‚Ìƒtƒ‹ƒpƒX‚ğæ“¾i‚È‚¯‚ê‚Î‹ój
+' é¸æŠã•ã‚ŒãŸãƒ†ãƒ³ãƒ—ãƒ¬ã®ãƒ•ãƒ«ãƒ‘ã‚¹ã‚’å–å¾—ï¼ˆãªã‘ã‚Œã°ç©ºï¼‰
 '========================================
 Public Property Get WM_SelectedTemplatePath() As String
     Dim idx As Long
@@ -545,41 +531,41 @@ End Property
 
 
 '========================================
-' ·‚µ‚İÀsFƒL[—ñ~ƒL[’l‚Ås“Á’è¨ƒeƒ“ƒvƒŒ‚Ö·‚µ‚İ¨ƒfƒXƒNƒgƒbƒv•Û‘¶
+' å·®ã—è¾¼ã¿å®Ÿè¡Œï¼šã‚­ãƒ¼åˆ—Ã—ã‚­ãƒ¼å€¤ã§è¡Œç‰¹å®šâ†’ãƒ†ãƒ³ãƒ—ãƒ¬ã¸å·®ã—è¾¼ã¿â†’ãƒ‡ã‚¹ã‚¯ãƒˆãƒƒãƒ—ä¿å­˜
 '========================================
-'--- Àsƒ{ƒ^ƒ“ ---
+'--- å®Ÿè¡Œãƒœã‚¿ãƒ³ ---
 Private Sub btnWM_Run_Click()
     On Error GoTo EH
     Dim tplPath As String, keyValue As String, outPath As String
     Dim ws As Worksheet
-    Set ws = ThisWorkbook.Worksheets("•\")
+    Set ws = ThisWorkbook.Worksheets("è¡¨")
 
     tplPath = Me.WM_SelectedTemplatePath
     keyValue = Trim$(CStr(Me.txtWM_KeyValue.Text))
 
     If Len(tplPath) = 0 Then
-        MsgBox "ƒeƒ“ƒvƒŒ[ƒg‚ª‘I‘ğ‚³‚ê‚Ä‚¢‚Ü‚¹‚ñB", vbExclamation: Exit Sub
+        MsgBox "ãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆãŒé¸æŠã•ã‚Œã¦ã„ã¾ã›ã‚“ã€‚", vbExclamation: Exit Sub
     End If
     If Len(keyValue) = 0 Then
-        MsgBox "ƒL[’l‚ğ“ü—Í‚µ‚Ä‚­‚¾‚³‚¢B", vbExclamation: Exit Sub
+        MsgBox "ã‚­ãƒ¼å€¤ã‚’å…¥åŠ›ã—ã¦ãã ã•ã„ã€‚", vbExclamation: Exit Sub
     End If
 
-    ' Œ©o‚µs‚Ìu“]‹Lv‚Ì‘¶İƒ`ƒFƒbƒN
+    ' è¦‹å‡ºã—è¡Œã®ã€Œè»¢è¨˜ã€ã®å­˜åœ¨ãƒã‚§ãƒƒã‚¯
     If GetColByHeaderLocal(ws, WM_KEY_HEADER) = 0 Then
-        MsgBox "Œ©o‚µs(3s–Ú)‚Éw" & WM_KEY_HEADER & "x‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñB", vbExclamation: Exit Sub
+        MsgBox "è¦‹å‡ºã—è¡Œ(3è¡Œç›®)ã«ã€" & WM_KEY_HEADER & "ã€ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã€‚", vbExclamation: Exit Sub
     End If
 
-    ' u•\vƒV[ƒg‚ğ“n‚·
+    ' ã€Œè¡¨ã€ã‚·ãƒ¼ãƒˆã‚’æ¸¡ã™
     outPath = modWordMerge.WM_MergeToWordUsingBookmarks(tplPath, WM_KEY_HEADER, keyValue, ws)
-    MsgBox "o—ÍŠ®—¹F" & vbCrLf & outPath, vbInformation
+    MsgBox "å‡ºåŠ›å®Œäº†ï¼š" & vbCrLf & outPath, vbInformation
     Exit Sub
 EH:
-    MsgBox "ƒGƒ‰[F " & Err.Description, vbCritical
+    MsgBox "ã‚¨ãƒ©ãƒ¼ï¼š " & Err.Description, vbCritical
 End Sub
 
-' === Œ©o‚µ–¼¨—ñ”Ô†iƒtƒH[ƒ€“àƒ[ƒJƒ‹‚ÌŒy—Ê”Åj ===
+' === è¦‹å‡ºã—åâ†’åˆ—ç•ªå·ï¼ˆãƒ•ã‚©ãƒ¼ãƒ å†…ãƒ­ãƒ¼ã‚«ãƒ«ã®è»½é‡ç‰ˆï¼‰ ===
 Private Function GetColByHeaderLocal(ByVal ws As Worksheet, ByVal headerName As String) As Long
-    Const HEADER_ROW As Long = 3          ' © ‚±‚±‚Åƒ[ƒJƒ‹’è”‚É‚·‚é
+    Const HEADER_ROW As Long = 3          ' â† ã“ã“ã§ãƒ­ãƒ¼ã‚«ãƒ«å®šæ•°ã«ã™ã‚‹
     Dim lastCol As Long, c As Long, tgt As String, cur As String
 
     tgt = LCase$(Replace(Trim$(headerName), " ", ""))
@@ -596,4 +582,3 @@ End Function
 
 
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         

@@ -1,17 +1,16 @@
-Attribute VB_Name = "modWordMerge"
 Option Explicit
-'==================== ’è”iŒ©o‚µEƒf[ƒ^ŠJnsj ====================
+'==================== å®šæ•°ï¼ˆè¦‹å‡ºã—ãƒ»ãƒ‡ãƒ¼ã‚¿é–‹å§‹è¡Œï¼‰ ====================
 Private Const WM_HEADER_ROW As Long = 3
 Private Const WM_DATA_START As Long = 4
-'==================== İ’èiƒeƒ“ƒvƒŒŠi”[ƒtƒHƒ‹ƒ_j ====================
-' «—ˆƒtƒHƒ‹ƒ_‚ğ•Ï‚¦‚½‚­‚È‚Á‚Ä‚àA‚±‚±‚¾‚¯’¼‚¹‚ÎOK
+'==================== è¨­å®šï¼ˆãƒ†ãƒ³ãƒ—ãƒ¬æ ¼ç´ãƒ•ã‚©ãƒ«ãƒ€ï¼‰ ====================
+' å°†æ¥ãƒ•ã‚©ãƒ«ãƒ€ã‚’å¤‰ãˆãŸããªã£ã¦ã‚‚ã€ã“ã“ã ã‘ç›´ã›ã°OK
 Public Function WM_TemplateDir() As String
-    WM_TemplateDir = "\\filesv15\“y–Ø‰Û\H–‚Æ•â•‹à‘ä’ \·ƒ[ƒh•¶‘"
+    WM_TemplateDir = "\\filesv15\åœŸæœ¨èª²\å·¥äº‹ã¨è£œåŠ©é‡‘å°å¸³\å·®è¾¼ãƒ¯ãƒ¼ãƒ‰æ–‡æ›¸"
 End Function
 '---------------------------------------------------------------------
 
-'--- WM_ListTemplates C³‚±‚±‚©‚ç ---
-' w’èƒtƒHƒ‹ƒ_”z‰º‚Ì Word •¶‘i.docx / .docm/ .dotmj‚ğÄ‹A“I‚É—ñ‹“‚µ‚Ä•Ô‚·iƒtƒ‹ƒpƒXj
+'--- WM_ListTemplates ä¿®æ­£ã“ã“ã‹ã‚‰ ---
+' æŒ‡å®šãƒ•ã‚©ãƒ«ãƒ€é…ä¸‹ã® Word æ–‡æ›¸ï¼ˆ.docx / .docm/ .dotmï¼‰ã‚’å†å¸°çš„ã«åˆ—æŒ™ã—ã¦è¿”ã™ï¼ˆãƒ•ãƒ«ãƒ‘ã‚¹ï¼‰
 Public Function WM_ListTemplates() As Collection
     Dim out As New Collection
     Dim fso As Object, rootFld As Object, dirPath As String
@@ -32,17 +31,17 @@ Public Function WM_ListTemplates() As Collection
     Set WM_ListTemplates = out
     Exit Function
 EH:
-    ' ¸”s‚Í‹óƒRƒŒƒNƒVƒ‡ƒ“
+    ' å¤±æ•—æ™‚ã¯ç©ºã‚³ãƒ¬ã‚¯ã‚·ãƒ§ãƒ³
     Set WM_ListTemplates = out
 End Function
-'--- WM_ListTemplates C³‚±‚±‚Ü‚Å ---
+'--- WM_ListTemplates ä¿®æ­£ã“ã“ã¾ã§ ---
 
-'--- WM_ListTemplates ƒwƒ‹ƒp[‚±‚±‚©‚ç ---
-' w’èƒtƒHƒ‹ƒ_“à‚¨‚æ‚ÑƒTƒuƒtƒHƒ‹ƒ_‚ğÄ‹A“I‚É‘–¸‚µA‘ÎÛŠg’£q‚ğûW
+'--- WM_ListTemplates ãƒ˜ãƒ«ãƒ‘ãƒ¼ã“ã“ã‹ã‚‰ ---
+' æŒ‡å®šãƒ•ã‚©ãƒ«ãƒ€å†…ãŠã‚ˆã³ã‚µãƒ–ãƒ•ã‚©ãƒ«ãƒ€ã‚’å†å¸°çš„ã«èµ°æŸ»ã—ã€å¯¾è±¡æ‹¡å¼µå­ã‚’åé›†
 Private Sub WM_CollectTemplatesInFolder(ByVal fld As Object, ByRef out As Collection, ByVal fso As Object)
     Dim f As Object, subFld As Object, ext As String
 
-    On Error Resume Next    ' ŒÂ•ÊƒtƒHƒ‹ƒ_‚Å‚ÌƒAƒNƒZƒX•s‰Â‚ÍƒXƒLƒbƒv
+    On Error Resume Next    ' å€‹åˆ¥ãƒ•ã‚©ãƒ«ãƒ€ã§ã®ã‚¢ã‚¯ã‚»ã‚¹ä¸å¯ã¯ã‚¹ã‚­ãƒƒãƒ—
 
     For Each f In fld.files
         ext = LCase$(fso.GetExtensionName(f.path))
@@ -53,12 +52,12 @@ Private Sub WM_CollectTemplatesInFolder(ByVal fld As Object, ByRef out As Collec
         WM_CollectTemplatesInFolder subFld, out, fso
     Next
 End Sub
-'--- WM_ListTemplates ƒwƒ‹ƒp[‚±‚±‚Ü‚Å ---
+'--- WM_ListTemplates ãƒ˜ãƒ«ãƒ‘ãƒ¼ã“ã“ã¾ã§ ---
 
-' --- [Œã3s] ---
+' --- [å¾Œ3è¡Œ] ---
 
-' --- [‘O3s] ---
-' ƒpƒX‚©‚çŠg’£q‚ğœ‚¢‚½ƒtƒ@ƒCƒ‹–¼‚ğ•Ô‚·i•\¦—pj
+' --- [å‰3è¡Œ] ---
+' ãƒ‘ã‚¹ã‹ã‚‰æ‹¡å¼µå­ã‚’é™¤ã„ãŸãƒ•ã‚¡ã‚¤ãƒ«åã‚’è¿”ã™ï¼ˆè¡¨ç¤ºç”¨ï¼‰
 Public Function WM_GetBaseName(ByVal path As String) As String
     Dim nm As String
     nm = Mid$(path, InStrRev(path, "\") + 1)
@@ -68,8 +67,8 @@ End Function
 
 
 
-' --- ‘O3s ---
-' ƒfƒXƒNƒgƒbƒv‚ÌƒpƒXiOneDrive˜AŒg‚Å‚àˆÀ’èj
+' --- å‰3è¡Œ ---
+' ãƒ‡ã‚¹ã‚¯ãƒˆãƒƒãƒ—ã®ãƒ‘ã‚¹ï¼ˆOneDriveé€£æºã§ã‚‚å®‰å®šï¼‰
 Public Function WM_GetDesktopPath() As String
     Dim sh As Object, p As String
     On Error Resume Next
@@ -79,10 +78,10 @@ Public Function WM_GetDesktopPath() As String
     If Len(p) = 0 Then p = Environ$("USERPROFILE") & "\Desktop"
     WM_GetDesktopPath = p
 End Function
-' --- Œã3s ---
+' --- å¾Œ3è¡Œ ---
 
-' --- ‘O3s ---
-' Œ©o‚µ3s–Ú‚Ì”ñ‹óƒZƒ‹‚ğûW‚µ‚Ä•Ô‚·
+' --- å‰3è¡Œ ---
+' è¦‹å‡ºã—3è¡Œç›®ã®éç©ºã‚»ãƒ«ã‚’åé›†ã—ã¦è¿”ã™
 Public Function WM_GetHeaders(ByVal ws As Worksheet) As Collection
     Dim col As New Collection, lastCol As Long, c As Long, v As String
     lastCol = ws.Cells(WM_HEADER_ROW, ws.Columns.Count).End(xlToLeft).Column
@@ -92,10 +91,10 @@ Public Function WM_GetHeaders(ByVal ws As Worksheet) As Collection
     Next
     Set WM_GetHeaders = col
 End Function
-' --- Œã3s ---
+' --- å¾Œ3è¡Œ ---
 
-' --- ‘O3s ---
-' Œ©o‚µ–¼¨—ñ”Ô†i‹ó”’/‘å¬–³‹j
+' --- å‰3è¡Œ ---
+' è¦‹å‡ºã—åâ†’åˆ—ç•ªå·ï¼ˆç©ºç™½/å¤§å°ç„¡è¦–ï¼‰
 Private Function WM_GetColByHeader(ByVal ws As Worksheet, ByVal headerName As String) As Long
     Dim lastCol As Long, c As Long, tgt As String, cur As String
     tgt = LCase$(Replace(Trim$(headerName), " ", ""))
@@ -106,10 +105,10 @@ Private Function WM_GetColByHeader(ByVal ws As Worksheet, ByVal headerName As St
     Next
     WM_GetColByHeader = 0
 End Function
-' --- Œã3s ---
+' --- å¾Œ3è¡Œ ---
 
-' --- ‘O3s ---
-' keyHeader —ñ‚Å keyValue ‚ğ’T‚µ‚Äs”Ô†i–³‚¯‚ê‚Î 0j
+' --- å‰3è¡Œ ---
+' keyHeader åˆ—ã§ keyValue ã‚’æ¢ã—ã¦è¡Œç•ªå·ï¼ˆç„¡ã‘ã‚Œã° 0ï¼‰
 Private Function WM_FindRowByKey(ByVal ws As Worksheet, ByVal keyHeader As String, ByVal keyValue As String) As Long
     Dim keyCol As Long, lastRow As Long, r As Long
     keyCol = WM_GetColByHeader(ws, keyHeader)
@@ -122,10 +121,10 @@ Private Function WM_FindRowByKey(ByVal ws As Worksheet, ByVal keyHeader As Strin
         End If
     Next
 End Function
-' --- Œã3s ---
+' --- å¾Œ3è¡Œ ---
 
-' --- ‘O3s ---
-' w’ès~Œ©o‚µ‚Ì’li•¶š—ñj‚ğ•Ô‚·i–³‚¯‚ê‚Î‹ój
+' --- å‰3è¡Œ ---
+' æŒ‡å®šè¡ŒÃ—è¦‹å‡ºã—ã®å€¤ï¼ˆæ–‡å­—åˆ—ï¼‰ã‚’è¿”ã™ï¼ˆç„¡ã‘ã‚Œã°ç©ºï¼‰
 Private Function WM_GetValueByHeader(ByVal ws As Worksheet, ByVal r As Long, ByVal headerName As String) As String
     Dim c As Long
     c = WM_GetColByHeader(ws, headerName)
@@ -135,19 +134,19 @@ Private Function WM_GetValueByHeader(ByVal ws As Worksheet, ByVal r As Long, ByV
         WM_GetValueByHeader = CStr(ws.Cells(r, c).value)
     End If
 End Function
-' --- Œã3s ---
+' --- å¾Œ3è¡Œ ---
 
-' --- ‘O3s ---
-' ‘®iŠÈˆÕjF‹àŠz/“ú•t‚Í®Œ`A‚»‚êˆÈŠO‚Í•¶š—ñ
+' --- å‰3è¡Œ ---
+' æ›¸å¼ï¼ˆç°¡æ˜“ï¼‰ï¼šé‡‘é¡/æ—¥ä»˜ã¯æ•´å½¢ã€ãã‚Œä»¥å¤–ã¯æ–‡å­—åˆ—
 Private Function WM_FormatForBookmark(ByVal headerName As String, ByVal v As Variant) As String
     Dim h As String, s As String
     h = Replace$(headerName, " ", "")
     Select Case True
-        Case InStr(h, "‹àŠz") > 0 Or InStr(h, "’P‰¿") > 0 Or InStr(h, "Šz") > 0
+        Case InStr(h, "é‡‘é¡") > 0 Or InStr(h, "å˜ä¾¡") > 0 Or InStr(h, "é¡") > 0
             If IsNumeric(v) Then s = Format$(CDbl(v), "#,##0") Else s = CStr(v)
-        Case InStr(h, "“ú") > 0 Or LCase$(h) Like "*date*"
+        Case InStr(h, "æ—¥") > 0 Or LCase$(h) Like "*date*"
             On Error Resume Next
-            s = Format$(CDate(v), "yyyy”NmŒd“ú")
+            s = Format$(CDate(v), "yyyyå¹´mæœˆdæ—¥")
             If Err.Number <> 0 Then s = CStr(v)
             On Error GoTo 0
         Case Else
@@ -158,7 +157,7 @@ End Function
 
 
 
-' –{‘ÌFƒeƒ“ƒvƒŒ‚Ì‘SƒuƒbƒNƒ}[ƒN–¼‚ğ—ñ‹“¨“¯–¼Œ©o‚µ‚©‚ç’l‚ğæ“¾¨·‚µ‚İ¨ƒfƒXƒNƒgƒbƒv•Û‘¶
+' æœ¬ä½“ï¼šãƒ†ãƒ³ãƒ—ãƒ¬ã®å…¨ãƒ–ãƒƒã‚¯ãƒãƒ¼ã‚¯åã‚’åˆ—æŒ™â†’åŒåè¦‹å‡ºã—ã‹ã‚‰å€¤ã‚’å–å¾—â†’å·®ã—è¾¼ã¿â†’ãƒ‡ã‚¹ã‚¯ãƒˆãƒƒãƒ—ä¿å­˜
 Public Function WM_MergeToWordUsingBookmarks(ByVal templatePath As String, _
                                              ByVal keyHeader As String, _
                                              ByVal keyValue As String, _
@@ -168,17 +167,17 @@ Public Function WM_MergeToWordUsingBookmarks(ByVal templatePath As String, _
     Dim outName As String, outPath As String, desk As String, base As String
     On Error GoTo EH
     
-    If Len(Dir$(templatePath, vbNormal)) = 0 Then Err.Raise 1001, , "ƒeƒ“ƒvƒŒ–¢ŒŸo: " & templatePath
-    If Len(keyHeader) = 0 Then Err.Raise 1002, , "ƒL[—ñiŒ©o‚µj‚ª‹ó‚Å‚·"
-    If Len(keyValue) = 0 Then Err.Raise 1003, , "ƒL[’l‚ª‹ó‚Å‚·"
+    If Len(Dir$(templatePath, vbNormal)) = 0 Then Err.Raise 1001, , "ãƒ†ãƒ³ãƒ—ãƒ¬æœªæ¤œå‡º: " & templatePath
+    If Len(keyHeader) = 0 Then Err.Raise 1002, , "ã‚­ãƒ¼åˆ—ï¼ˆè¦‹å‡ºã—ï¼‰ãŒç©ºã§ã™"
+    If Len(keyValue) = 0 Then Err.Raise 1003, , "ã‚­ãƒ¼å€¤ãŒç©ºã§ã™"
     
     r = WM_FindRowByKey(ws, keyHeader, keyValue)
-    If r < WM_DATA_START Then Err.Raise 1004, , "ƒL[’l‚Éˆê’v‚·‚és‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ: " & keyValue
+    If r < WM_DATA_START Then Err.Raise 1004, , "ã‚­ãƒ¼å€¤ã«ä¸€è‡´ã™ã‚‹è¡ŒãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“: " & keyValue
     
     Set wdApp = CreateObject("Word.Application")
     wdApp.Visible = False
 
-    ' š‚±‚±‚ÅŠg’£q•Ê‚ÉŠJ‚«•û‚ğØ‘Öi.dotm/.dotx ‚Íƒeƒ“ƒvƒŒ‚©‚çV‹Kj
+    ' â˜…ã“ã“ã§æ‹¡å¼µå­åˆ¥ã«é–‹ãæ–¹ã‚’åˆ‡æ›¿ï¼ˆ.dotm/.dotx ã¯ãƒ†ãƒ³ãƒ—ãƒ¬ã‹ã‚‰æ–°è¦ï¼‰
     Dim ext As String
     ext = LCase$(Mid$(templatePath, InStrRev(templatePath, ".") + 1))
     If ext = "dotm" Or ext = "dotx" Then
@@ -187,26 +186,26 @@ Public Function WM_MergeToWordUsingBookmarks(ByVal templatePath As String, _
         Set wdDoc = wdApp.Documents.Open(templatePath, ReadOnly:=True)
     End If
 
-    ' šu•¶‘1v–â‘è‚ğ–h‚®FÅ‰‚É•Û‘¶æ‚ğŠm’èiˆÈŒã‚Íã‘‚«•Û‘¶‚ªŒø‚­j
+    ' â˜…ã€Œæ–‡æ›¸1ã€å•é¡Œã‚’é˜²ãï¼šæœ€åˆã«ä¿å­˜å…ˆã‚’ç¢ºå®šï¼ˆä»¥å¾Œã¯ä¸Šæ›¸ãä¿å­˜ãŒåŠ¹ãï¼‰
     desk = WM_GetDesktopPath()
     base = WM_GetBaseName(templatePath)
     outName = WM_SanitizeFileName(base & "_" & keyValue) & ".docx"
     
-    ' š’Ç‰ÁFƒtƒ‹ƒpƒX’·‚ª’·‚·‚¬‚È‚¢‚æ‚¤‚ÉÄ’²®iMAX 240 –ÚˆÀj
+    ' â˜…è¿½åŠ ï¼šãƒ•ãƒ«ãƒ‘ã‚¹é•·ãŒé•·ã™ããªã„ã‚ˆã†ã«å†èª¿æ•´ï¼ˆMAX 240 ç›®å®‰ï¼‰
     Dim maxNameLen As Long
-    maxNameLen = 240 - (Len(desk) + 1) ' u\v‚Ô‚ñ +1
+    maxNameLen = 240 - (Len(desk) + 1) ' ã€Œ\ã€ã¶ã‚“ +1
     If Len(outName) > maxNameLen Then
         outName = Left$(outName, maxNameLen)
     End If
 
     outPath = desk & "\" & outName
 
-    ' š•Û‘¶i‚±‚±‚ªƒRƒP‚â‚·‚¢‚Ì‚ÅŒÂ•Ê‚Éˆ¬‚éj
+    ' â˜…ä¿å­˜ï¼ˆã“ã“ãŒã‚³ã‚±ã‚„ã™ã„ã®ã§å€‹åˆ¥ã«æ¡ã‚‹ï¼‰
     On Error GoTo SaveErr
     wdDoc.SaveAs2 fileName:=outPath, FileFormat:=12, AddToRecentFiles:=False
     On Error GoTo EH
 
-    ' ‡@ ƒuƒbƒNƒ}[ƒN–¼‚ğ”z—ñ‚É‘Ş”ği0Œ‚È‚çƒXƒLƒbƒvj
+    ' â‘  ãƒ–ãƒƒã‚¯ãƒãƒ¼ã‚¯åã‚’é…åˆ—ã«é€€é¿ï¼ˆ0ä»¶ãªã‚‰ã‚¹ã‚­ãƒƒãƒ—ï¼‰
     Dim i As Long, bmCount As Long, names() As String
     bmCount = wdDoc.Bookmarks.Count
     If bmCount > 0 Then
@@ -215,7 +214,7 @@ Public Function WM_MergeToWordUsingBookmarks(ByVal templatePath As String, _
             names(i) = wdDoc.Bookmarks(i).name
         Next i
 
-        ' ‡A ŠeƒuƒbƒNƒ}[ƒN‚Ö·‚µ‚İií‚ÉÄ’Ç‰Á‚Ü‚Ås‚¤FˆÀ‘S”Åj
+        ' â‘¡ å„ãƒ–ãƒƒã‚¯ãƒãƒ¼ã‚¯ã¸å·®ã—è¾¼ã¿ï¼ˆå¸¸ã«å†è¿½åŠ ã¾ã§è¡Œã†ï¼šå®‰å…¨ç‰ˆï¼‰
         Dim nm As String
         Dim rng As Object
         For i = 1 To UBound(names)
@@ -226,20 +225,20 @@ Public Function WM_MergeToWordUsingBookmarks(ByVal templatePath As String, _
             If wdDoc.Bookmarks.Exists(nm) Then
                 Set rng = wdDoc.Bookmarks(nm).Range
             Else
-                ' ƒuƒbƒNƒ}[ƒN©‘Ì‚ª‚È‚¢iƒeƒ“ƒvƒŒ•sˆê’v‚È‚ÇjFƒXƒLƒbƒv
+                ' ãƒ–ãƒƒã‚¯ãƒãƒ¼ã‚¯è‡ªä½“ãŒãªã„ï¼ˆãƒ†ãƒ³ãƒ—ãƒ¬ä¸ä¸€è‡´ãªã©ï¼‰ï¼šã‚¹ã‚­ãƒƒãƒ—
                 GoTo NextI
             End If
 
             rng.Text = outVal
 
-            ' š·‚µ‚ñ‚¾’l‚ğƒnƒCƒ‰ƒCƒgi‹ó‚È‚çŠO‚·j
+            ' â˜…å·®ã—è¾¼ã‚“ã å€¤ã‚’ãƒã‚¤ãƒ©ã‚¤ãƒˆï¼ˆç©ºãªã‚‰å¤–ã™ï¼‰
             If Len(outVal) > 0 Then
                 rng.HighlightColorIndex = 7   ' wdYellow
             Else
                 rng.HighlightColorIndex = 0   ' wdNoHighlight
             End If
 
-            ' šd—vF·‚µ‚İ‚ÅÁ‚¦‚é‚½‚ß–ˆ‰ñÄ’Ç‰Ái‰ó‚ê‘Îôj
+            ' â˜…é‡è¦ï¼šå·®ã—è¾¼ã¿ã§æ¶ˆãˆã‚‹ãŸã‚æ¯å›å†è¿½åŠ ï¼ˆå£Šã‚Œå¯¾ç­–ï¼‰
             wdDoc.Bookmarks.Add nm, rng
 
 NextI:
@@ -247,22 +246,22 @@ NextI:
 
     End If
 
-    ' š‘ŠŒİQÆ/ƒtƒB[ƒ‹ƒhXViŒİŠ·«d‹F–{•¶‚Ì‚İj
+    ' â˜…ç›¸äº’å‚ç…§/ãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰æ›´æ–°ï¼ˆäº’æ›æ€§é‡è¦–ï¼šæœ¬æ–‡ã®ã¿ï¼‰
     On Error Resume Next
-    wdDoc.content.Fields.Update                 ' © StoryRanges(1) ‚Å‚Í‚È‚­ Content ‚ÅˆÀ‘S‚É
+    wdDoc.content.Fields.Update                 ' â† StoryRanges(1) ã§ã¯ãªã Content ã§å®‰å…¨ã«
     On Error GoTo 0
 
-    ' šÄ•`‰æ••\¦İ’èiWord‚ÅŠmÀ‚É‘¶İ‚·‚éƒvƒƒpƒeƒB‚Ì‚İj
+    ' â˜…å†æç”»ï¼†è¡¨ç¤ºè¨­å®šï¼ˆWordã§ç¢ºå®Ÿã«å­˜åœ¨ã™ã‚‹ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ã®ã¿ï¼‰
     With wdApp
         .ScreenUpdating = False
     End With
     On Error Resume Next
-    wdApp.Options.ShowPicturePlaceholders = False   ' ‰æ‘œƒvƒŒ[ƒXƒzƒ‹ƒ_[‚ğ–³Œø
-    wdApp.Options.PrintDrawingObjects = True        ' ¦‘¶İ‚µ‚È‚¢ŠÂ‹«‚Å‚àOn Error‚Å–³‹
+    wdApp.Options.ShowPicturePlaceholders = False   ' ç”»åƒãƒ—ãƒ¬ãƒ¼ã‚¹ãƒ›ãƒ«ãƒ€ãƒ¼ã‚’ç„¡åŠ¹
+    wdApp.Options.PrintDrawingObjects = True        ' â€»å­˜åœ¨ã—ãªã„ç’°å¢ƒã§ã‚‚On Errorã§ç„¡è¦–
     On Error GoTo 0
-    'wdDoc.Repaginate  ' ©d‚¢Œ´ˆö‚É‚È‚è‚â‚·‚¢‚Ì‚Å‚Ü‚¸–³Œø
+    'wdDoc.Repaginate  ' â†é‡ã„åŸå› ã«ãªã‚Šã‚„ã™ã„ã®ã§ã¾ãšç„¡åŠ¹
 
-    ' š•\¦‡˜F‰Â‹‰»¨ƒAƒNƒeƒBƒu‰»¨ActiveWindow æ“¾¨ƒrƒ…[•ÏXi3‰ñƒŠƒgƒ‰ƒCj
+    ' â˜…è¡¨ç¤ºé †åºï¼šå¯è¦–åŒ–â†’ã‚¢ã‚¯ãƒ†ã‚£ãƒ–åŒ–â†’ActiveWindow å–å¾—â†’ãƒ“ãƒ¥ãƒ¼å¤‰æ›´ï¼ˆ3å›ãƒªãƒˆãƒ©ã‚¤ï¼‰
     wdApp.Visible = True
     wdDoc.Activate
 
@@ -271,7 +270,7 @@ NextI:
     For retry = 1 To 3
         Set wnd = wdApp.ActiveWindow
         If Not wnd Is Nothing Then
-            wnd.View.Type = 3                    ' 3 = wdPrintViewiˆóüƒŒƒCƒAƒEƒgj
+            wnd.View.Type = 3                    ' 3 = wdPrintViewï¼ˆå°åˆ·ãƒ¬ã‚¤ã‚¢ã‚¦ãƒˆï¼‰
             Exit For
         End If
         DoEvents
@@ -284,17 +283,17 @@ NextI:
 
 
 
-    ' š‚±‚±‚Å‚Í•Â‚¶‚È‚¢ƒ†[ƒU[‚ª•ÒW¨ã‘‚«•Û‘¶‚Å‚«‚éó‘Ô‚Åc‚·
+    ' â˜…ã“ã“ã§ã¯é–‰ã˜ãªã„ï¼ãƒ¦ãƒ¼ã‚¶ãƒ¼ãŒç·¨é›†â†’ä¸Šæ›¸ãä¿å­˜ã§ãã‚‹çŠ¶æ…‹ã§æ®‹ã™
     wdApp.Visible = True
 
     WM_MergeToWordUsingBookmarks = outPath
     Exit Function
     
 SaveErr:
-    MsgBox "•Û‘¶‚É¸”s‚µ‚Ü‚µ‚½B" & vbCrLf & _
-           "o—Íæ: " & outPath & vbCrLf & _
-           "Œ´ˆö‚Ì‘½‚­‚Íwƒtƒ@ƒCƒ‹–¼/ƒpƒX‚ª’·‚·‚¬‚éx‚±‚Æ‚Å‚·B" & vbCrLf & _
-           "Eƒeƒ“ƒvƒŒ–¼ ‚à‚µ‚­‚Í “]‹LƒL[’l ‚ğ’Z‚­‚µ‚ÄÄÀs‚µ‚Ä‚­‚¾‚³‚¢B", _
+    MsgBox "ä¿å­˜ã«å¤±æ•—ã—ã¾ã—ãŸã€‚" & vbCrLf & _
+           "å‡ºåŠ›å…ˆ: " & outPath & vbCrLf & _
+           "åŸå› ã®å¤šãã¯ã€ãƒ•ã‚¡ã‚¤ãƒ«å/ãƒ‘ã‚¹ãŒé•·ã™ãã‚‹ã€ã“ã¨ã§ã™ã€‚" & vbCrLf & _
+           "ãƒ»ãƒ†ãƒ³ãƒ—ãƒ¬å ã‚‚ã—ãã¯ è»¢è¨˜ã‚­ãƒ¼å€¤ ã‚’çŸ­ãã—ã¦å†å®Ÿè¡Œã—ã¦ãã ã•ã„ã€‚", _
            vbCritical
     Resume EH
     
@@ -306,29 +305,29 @@ EH:
     Err.Raise Err.Number, , Err.Description
 End Function
 
-' ƒtƒ@ƒCƒ‹–¼‚Ég‚¦‚È‚¢•¶š‚ğˆÀ‘S‚É’uŠ·
+' ãƒ•ã‚¡ã‚¤ãƒ«åã«ä½¿ãˆãªã„æ–‡å­—ã‚’å®‰å…¨ã«ç½®æ›
 Private Function WM_SanitizeFileName(ByVal s As String) As String
     Dim bad As Variant, i As Long
     bad = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
     For i = LBound(bad) To UBound(bad)
         s = Replace$(s, bad(i), "_")
     Next
-    ' ––”ö‚ÌƒsƒŠƒIƒh/ƒXƒy[ƒX‚Í•s‰Â
+    ' æœ«å°¾ã®ãƒ”ãƒªã‚ªãƒ‰/ã‚¹ãƒšãƒ¼ã‚¹ã¯ä¸å¯
     Do While Len(s) > 0 And (Right$(s, 1) = " " Or Right$(s, 1) = ".")
         s = Left$(s, Len(s) - 1)
     Loop
     If Len(s) = 0 Then s = "out"
-    ' š’Ç‰ÁF’·‚³‚ğ§ŒÀiUnicode ‚Å‚àˆÀS‰^—p‚Ì‚½‚ß 100 •¶š‚ÉŠÛ‚ßj
+    ' â˜…è¿½åŠ ï¼šé•·ã•ã‚’åˆ¶é™ï¼ˆUnicode ã§ã‚‚å®‰å¿ƒé‹ç”¨ã®ãŸã‚ 100 æ–‡å­—ã«ä¸¸ã‚ï¼‰
     If Len(s) > 100 Then s = Left$(s, 100)
     WM_SanitizeFileName = s
 End Function
-' ƒeƒ“ƒvƒŒ‚ÌƒuƒbƒNƒ}[ƒN–¼‚ÆExcelŒ©o‚µ‚Ì·‚ğ•\¦if’f—pj
+' ãƒ†ãƒ³ãƒ—ãƒ¬ã®ãƒ–ãƒƒã‚¯ãƒãƒ¼ã‚¯åã¨Excelè¦‹å‡ºã—ã®å·®ã‚’è¡¨ç¤ºï¼ˆè¨ºæ–­ç”¨ï¼‰
 Public Sub WM_CheckTemplateAgainstHeaders(ByVal templatePath As String, ByVal ws As Worksheet)
     Dim wdApp As Object, wdDoc As Object, i As Long
     Dim dict As Object: Set dict = CreateObject("Scripting.Dictionary")
     Dim cols As Collection, miss As String, key As String
 
-    ' Œ©o‚µi3s–Új‚ğ«‘‚Öi‹ó”’–³‹E¬•¶š‰»j
+    ' è¦‹å‡ºã—ï¼ˆ3è¡Œç›®ï¼‰ã‚’è¾æ›¸ã¸ï¼ˆç©ºç™½ç„¡è¦–ãƒ»å°æ–‡å­—åŒ–ï¼‰
     Set cols = WM_GetHeaders(ws)
     For i = 1 To cols.Count
         key = LCase$(Replace(CStr(cols(i)), " ", ""))
@@ -341,7 +340,7 @@ Public Sub WM_CheckTemplateAgainstHeaders(ByVal templatePath As String, ByVal ws
     For i = 1 To wdDoc.Bookmarks.Count
         key = LCase$(Replace(wdDoc.Bookmarks(i).name, " ", ""))
         If Not dict.Exists(key) Then
-            miss = miss & "E" & wdDoc.Bookmarks(i).name & vbCrLf
+            miss = miss & "ãƒ»" & wdDoc.Bookmarks(i).name & vbCrLf
         End If
     Next
 
@@ -349,10 +348,10 @@ Public Sub WM_CheckTemplateAgainstHeaders(ByVal templatePath As String, ByVal ws
     wdApp.Quit
 
     If Len(miss) > 0 Then
-        MsgBox "ExcelŒ©o‚µ‚É–³‚¢ƒuƒbƒNƒ}[ƒN‚ª‚ ‚è‚Ü‚·:" & vbCrLf & miss, vbInformation
+        MsgBox "Excelè¦‹å‡ºã—ã«ç„¡ã„ãƒ–ãƒƒã‚¯ãƒãƒ¼ã‚¯ãŒã‚ã‚Šã¾ã™:" & vbCrLf & miss, vbInformation
     Else
-        MsgBox "ƒeƒ“ƒvƒŒ‚ÌƒuƒbƒNƒ}[ƒN‚Í‚·‚×‚ÄExcelŒ©o‚µ‚Æˆê’v‚µ‚Ä‚¢‚Ü‚·B", vbInformation
+        MsgBox "ãƒ†ãƒ³ãƒ—ãƒ¬ã®ãƒ–ãƒƒã‚¯ãƒãƒ¼ã‚¯ã¯ã™ã¹ã¦Excelè¦‹å‡ºã—ã¨ä¸€è‡´ã—ã¦ã„ã¾ã™ã€‚", vbInformation
     End If
 End Sub
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+
