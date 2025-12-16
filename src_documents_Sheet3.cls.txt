@@ -15,129 +15,152 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Dim i As Long, lastRow As Long
     Dim usedNumbers As Object
     Dim nextNumber As Long
-    Dim cell As Range
-    Dim ”Ô† As String
-    Dim Œ–¼—ñ As Long, Ì”Ô—ñ As Long, ×Xß—ñ As Long
-    Dim ŒJ‰zŒê”ö As String
+    Dim cell As Range, editCell As Range
+    Dim ï¿½Ôï¿½ As String
+    Dim ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ As Long, ï¿½Ì”Ô—ï¿½ As Long, ï¿½×Xï¿½ß—ï¿½ As Long
+    Dim ï¿½Jï¿½zï¿½ï¿½ï¿½ As String
     Dim row As Long, val As String
     Dim srcCol As Long, condCol As Long, destCol As Long
     Dim colMap As Object
+    Dim lastEditorCol As Long
+    Dim userID As String
+    Dim displayName As String
+    Dim editRow As Long
     Set colMap = CreateObject("Scripting.Dictionary")
 
     On Error GoTo ErrorHandler
     
-    ' === C³ƒ|ƒCƒ“ƒg‡@F1s–Úi’Ê‚µ”Ô†sj‚Ì•ÏX‚Íˆ—‚ğƒXƒLƒbƒv ===
+    ' === ï¿½Cï¿½ï¿½ï¿½|ï¿½Cï¿½ï¿½ï¿½gï¿½@ï¿½F1ï¿½sï¿½Úiï¿½Ê‚ï¿½ï¿½Ôï¿½ï¿½sï¿½jï¿½Ì•ÏXï¿½ï¿½ï¿½Íï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Xï¿½Lï¿½bï¿½v ===
     If Not Intersect(Target, Me.Rows(1)) Is Nothing Then
         GoTo CleanExit
     End If
     
-    ' š s‚Ü‚é‚²‚Æ‚Ì‘€ìi‘}“üEíœ‚È‚Çj‚Í‰½‚à‚µ‚È‚¢
+    ' ï¿½ï¿½ ï¿½sï¿½Ü‚é‚²ï¿½Æ‚Ì‘ï¿½ï¿½ï¿½iï¿½}ï¿½ï¿½ï¿½Eï¿½íœï¿½È‚Çjï¿½Í‰ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È‚ï¿½
     If Target.Address = Target.EntireRow.Address Then Exit Sub
 
     Application.EnableEvents = False
 
-    ' ¥ ‚Ç‚Ì•ÒW‚Å‚à‚Ü‚¸ƒƒO•‰©F“h‚èi•\ƒV[ƒg‚©‚Ç‚¤‚©‚Í’†‚Å”»’èj
+    ' ï¿½ï¿½ ï¿½Ç‚Ì•ÒWï¿½Å‚ï¿½ï¿½Ü‚ï¿½ï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½ï¿½ï¿½Fï¿½hï¿½ï¿½iï¿½\ï¿½Vï¿½[ï¿½gï¿½ï¿½ï¿½Ç‚ï¿½ï¿½ï¿½ï¿½Í’ï¿½ï¿½Å”ï¿½ï¿½ï¿½j
     Call LogEditAndHighlight(Target)
 
-    ŒJ‰zŒê”ö = "kŒJ‰z–¾‹–•ªl"
+    ' === ï¿½ÅIï¿½ÒWï¿½Ò‚Ì•\ï¿½ï¿½ï¿½ï¿½ï¿½Mï¿½iIDâ†’ï¿½ï¿½ï¿½Oï¿½É•ÏXï¿½j ===
+    lastEditorCol = GetHeaderColumn(Me, EDITLOG_HDR_EDITOR)
+    If lastEditorCol > 0 Then
+        userID = Trim$(Environ$("USERNAME"))
+        If userID = "" Then userID = Application.UserName
+
+        Call RegisterIDIfNew(userID)
+        displayName = ResolveUserDisplayName(userID)
+
+        Dim editRange As Range
+        Set editRange = Intersect(Target, Me.Rows(EDITLOG_DATA_START & ":" & Me.Rows.Count))
+        If Not editRange Is Nothing Then
+            For Each editCell In editRange.Cells
+                editRow = editCell.row
+                Me.Cells(editRow, lastEditorCol).value = displayName
+            Next editCell
+        End If
+    End If
+
+    ï¿½Jï¿½zï¿½ï¿½ï¿½ = "ï¿½kï¿½Jï¿½zï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½l"
 
 
-    ' === Œ©o‚µ–¼‚Æ—ñ”Ô†‚ğ‹L˜^ ===
+    ' === ï¿½ï¿½ï¿½oï¿½ï¿½ï¿½ï¿½ï¿½Æ—ï¿½Ôï¿½ï¿½ï¿½ï¿½Lï¿½^ ===
     For i = 1 To Me.Cells(3, Columns.Count).End(xlToLeft).Column
         colMap(Me.Cells(3, i).value) = i
         Select Case Me.Cells(3, i).value
-            Case "Œ–¼": Œ–¼—ñ = i
-            Case "Ì”Ô": Ì”Ô—ñ = i
-            Case "×XßkŒJ‰z–¾‹–•ªl": ×Xß—ñ = i
+            Case "ï¿½ï¿½ï¿½ï¿½": ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ = i
+            Case "ï¿½Ì”ï¿½": ï¿½Ì”Ô—ï¿½ = i
+            Case "ï¿½×Xï¿½ßkï¿½Jï¿½zï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½l": ï¿½×Xï¿½ß—ï¿½ = i
         End Select
     Next i
 
-        ' === ‹ÆÒ–¼“ü—ÍF‘ã•\ÒEZŠ‚ğ©“®“ü—ÍiŒ©o‚µ–¼ƒx[ƒX‚ÅƒYƒŒ‚È‚¢j ===
+        ' === ï¿½ÆÒ–ï¿½ï¿½ï¿½ï¿½Íï¿½ï¿½Fï¿½ï¿½\ï¿½ÒEï¿½Zï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Íiï¿½ï¿½ï¿½oï¿½ï¿½ï¿½ï¿½ï¿½xï¿½[ï¿½Xï¿½ÅƒYï¿½ï¿½ï¿½È‚ï¿½ï¿½j ===
     Dim headerRow As Long: headerRow = 3
-    Dim col‹ÆÒ As Long, col‹NˆÄ“ú As Long, col‘ã•\Ò As Long, colZŠ As Long
+    Dim colï¿½Æï¿½ As Long, colï¿½Nï¿½Ä“ï¿½ As Long, colï¿½ï¿½\ï¿½ï¿½ As Long, colï¿½Zï¿½ï¿½ As Long
 
-    ' š‚ ‚È‚½‚ÌŒ©o‚µ‚É‡‚í‚¹‚½Œó•âi•K—v‚É‰‚¶‚Ä’Ç‰ÁOKj
-    col‹ÆÒ = ColFrom(colMap, "{H‹ÆÒEÂŒ Ò", "‹ÆÒ–¼", "{H‹ÆÒ", "ÂŒ Ò")
-    col‹NˆÄ“ú = ColFrom(colMap, "‹NˆÄ“ú", "‹NˆÄ“ú•t")
-    col‘ã•\Ò = ColFrom(colMap, "‘ã•\Ò", "‘ã•\Ò–¼", "’S“–Ò")   ' ’S“–Ò‚ğ‘ã•\Ò‚É—¬—p‚µ‚½‚¢ê‡‚Ì•ÛŒ¯
-    colZŠ = ColFrom(colMap, "ZŠ", "Šİ’n")
+    ' ï¿½ï¿½ï¿½ï¿½ï¿½È‚ï¿½ï¿½ÌŒï¿½ï¿½oï¿½ï¿½ï¿½Éï¿½ï¿½í‚¹ï¿½ï¿½ï¿½ï¿½ï¿½iï¿½Kï¿½vï¿½É‰ï¿½ï¿½ï¿½ï¿½Ä’Ç‰ï¿½OKï¿½j
+    colï¿½Æï¿½ = ColFrom(colMap, "ï¿½{ï¿½Hï¿½ÆÒEï¿½ÂŒï¿½ï¿½ï¿½", "ï¿½ÆÒ–ï¿½", "ï¿½{ï¿½Hï¿½Æï¿½", "ï¿½ÂŒï¿½ï¿½ï¿½")
+    colï¿½Nï¿½Ä“ï¿½ = ColFrom(colMap, "ï¿½Nï¿½Ä“ï¿½", "ï¿½Nï¿½Ä“ï¿½ï¿½t")
+    colï¿½ï¿½\ï¿½ï¿½ = ColFrom(colMap, "ï¿½ï¿½\ï¿½ï¿½", "ï¿½ï¿½\ï¿½Ò–ï¿½", "ï¿½Sï¿½ï¿½ï¿½ï¿½")   ' ï¿½Sï¿½ï¿½ï¿½Ò‚ï¿½ï¿½\ï¿½Ò‚É—ï¿½ï¿½pï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ê‡ï¿½Ì•ÛŒï¿½
+    colï¿½Zï¿½ï¿½ = ColFrom(colMap, "ï¿½Zï¿½ï¿½", "ï¿½ï¿½ï¿½İ’n")
 
-    If col‹ÆÒ > 0 And col‹NˆÄ“ú > 0 And col‘ã•\Ò > 0 And colZŠ > 0 Then
-        Dim rng‹ÆÒ As Range, c As Range
-        Set rng‹ÆÒ = Intersect(Target, Me.Range(Me.Cells(headerRow + 1, col‹ÆÒ), Me.Cells(Rows.Count, col‹ÆÒ).End(xlUp)))
-        If Not rng‹ÆÒ Is Nothing Then
-            For Each c In rng‹ÆÒ.Cells
+    If colï¿½Æï¿½ > 0 And colï¿½Nï¿½Ä“ï¿½ > 0 And colï¿½ï¿½\ï¿½ï¿½ > 0 And colï¿½Zï¿½ï¿½ > 0 Then
+        Dim rngï¿½Æï¿½ As Range, c As Range
+        Set rngï¿½Æï¿½ = Intersect(Target, Me.Range(Me.Cells(headerRow + 1, colï¿½Æï¿½), Me.Cells(Rows.Count, colï¿½Æï¿½).End(xlUp)))
+        If Not rngï¿½Æï¿½ Is Nothing Then
+            For Each c In rngï¿½Æï¿½.Cells
                 If Trim(c.value) <> "" Then
                     Dim key As String, rep As String, addr As String
-                    key = Replace(Replace(Application.Trim(Replace(CStr(c.value), "@", " ")), vbCr, ""), vbLf, "")
+                    key = Replace(Replace(Application.Trim(Replace(CStr(c.value), "ï¿½@", " ")), vbCr, ""), vbLf, "")
 
-                    GetLatestRepAddr Me, headerRow, col‹ÆÒ, col‹NˆÄ“ú, col‘ã•\Ò, colZŠ, c.row, key, rep, addr
-                    If rep <> "" Then Me.Cells(c.row, col‘ã•\Ò).value = rep
-                    If addr <> "" Then Me.Cells(c.row, colZŠ).value = addr
+                    GetLatestRepAddr Me, headerRow, colï¿½Æï¿½, colï¿½Nï¿½Ä“ï¿½, colï¿½ï¿½\ï¿½ï¿½, colï¿½Zï¿½ï¿½, c.row, key, rep, addr
+                    If rep <> "" Then Me.Cells(c.row, colï¿½ï¿½\ï¿½ï¿½).value = rep
+                    If addr <> "" Then Me.Cells(c.row, colï¿½Zï¿½ï¿½).value = addr
                 End If
             Next c
         End If
     End If
 
 
-    ' === ×Xß‚ÌŒê”ö’Ç‰Á ===
-    If ×Xß—ñ > 0 Then
-        If Not Intersect(Target, Me.Range(Me.Cells(4, ×Xß—ñ), Me.Cells(1000, ×Xß—ñ))) Is Nothing Then
-            For Each cell In Intersect(Target, Me.Range(Me.Cells(4, ×Xß—ñ), Me.Cells(1000, ×Xß—ñ)))
+    ' === ï¿½×Xï¿½ß‚ÌŒï¿½ï¿½ï¿½Ç‰ï¿½ ===
+    If ï¿½×Xï¿½ß—ï¿½ > 0 Then
+        If Not Intersect(Target, Me.Range(Me.Cells(4, ï¿½×Xï¿½ß—ï¿½), Me.Cells(1000, ï¿½×Xï¿½ß—ï¿½))) Is Nothing Then
+            For Each cell In Intersect(Target, Me.Range(Me.Cells(4, ï¿½×Xï¿½ß—ï¿½), Me.Cells(1000, ï¿½×Xï¿½ß—ï¿½)))
                 If Trim(cell.value) <> "" Then
                     Dim original As String, normalized As String
                     original = cell.value
-                    normalized = Replace(Replace(Replace(Trim(original), vbCr, ""), vbLf, ""), "@", "")
-                    If Right(normalized, Len(ŒJ‰zŒê”ö)) <> ŒJ‰zŒê”ö Then
-                        cell.value = Trim(original) & ŒJ‰zŒê”ö
+                    normalized = Replace(Replace(Replace(Trim(original), vbCr, ""), vbLf, ""), "ï¿½@", "")
+                    If Right(normalized, Len(ï¿½Jï¿½zï¿½ï¿½ï¿½)) <> ï¿½Jï¿½zï¿½ï¿½ï¿½ Then
+                        cell.value = Trim(original) & ï¿½Jï¿½zï¿½ï¿½ï¿½
                     End If
                 End If
             Next cell
         End If
     End If
 
-    ' === Ì”Ôˆ— ===
-    If Œ–¼—ñ > 0 And Ì”Ô—ñ > 0 Then
-        If Not Intersect(Target, Me.Range(Me.Cells(4, Œ–¼—ñ), Me.Cells(Rows.Count, Œ–¼—ñ).End(xlUp))) Is Nothing Then
+    ' === ï¿½Ì”Ôï¿½ï¿½ï¿½ ===
+    If ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ > 0 And ï¿½Ì”Ô—ï¿½ > 0 Then
+        If Not Intersect(Target, Me.Range(Me.Cells(4, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½), Me.Cells(Rows.Count, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½).End(xlUp))) Is Nothing Then
             Set usedNumbers = CreateObject("Scripting.Dictionary")
-            lastRow = Me.Cells(Me.Rows.Count, Œ–¼—ñ).End(xlUp).row
+            lastRow = Me.Cells(Me.Rows.Count, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½).End(xlUp).row
             For i = 4 To lastRow
-                ”Ô† = Me.Cells(i, Ì”Ô—ñ).value
-                If ”Ô† <> "" Then usedNumbers(CStr(Format(”Ô†, "000"))) = True
+                ï¿½Ôï¿½ = Me.Cells(i, ï¿½Ì”Ô—ï¿½).value
+                If ï¿½Ôï¿½ <> "" Then usedNumbers(CStr(Format(ï¿½Ôï¿½, "000"))) = True
             Next i
-            For Each cell In Intersect(Target, Me.Range(Me.Cells(4, Œ–¼—ñ), Me.Cells(Rows.Count, Œ–¼—ñ).End(xlUp)))
-                If Trim(cell.value) <> "" And Me.Cells(cell.row, Ì”Ô—ñ).value = "" Then
+            For Each cell In Intersect(Target, Me.Range(Me.Cells(4, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½), Me.Cells(Rows.Count, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½).End(xlUp)))
+                If Trim(cell.value) <> "" And Me.Cells(cell.row, ï¿½Ì”Ô—ï¿½).value = "" Then
                     nextNumber = 1
                     Do While usedNumbers.Exists(Format(nextNumber, "000"))
                         nextNumber = nextNumber + 1
                     Loop
-                    Me.Cells(cell.row, Ì”Ô—ñ).value = Format(nextNumber, "000")
+                    Me.Cells(cell.row, ï¿½Ì”Ô—ï¿½).value = Format(nextNumber, "000")
                     usedNumbers.Add Format(nextNumber, "000"), True
                 End If
             Next cell
         End If
     End If
     
-    ' === HŠúI—¹“ú‚Ì”½‰f ===
-    Dim HŠúƒyƒA As Variant
-    HŠúƒyƒA = Array( _
-        Array("I‡@", "•ÏX“à—e‡A", "I‡A"), _
-        Array("I‡A", "•ÏX“à—e‡B", "I‡B"), _
-        Array("I‡B", "•ÏX“à—e‡C", "I‡C"), _
-        Array("Ia", "•ÏX“à—eb", "Ib"), _
-        Array("Ib", "•ÏX“à—ec", "Ic"), _
-        Array("Ic", "•ÏX“à—ed", "Id") _
+    ' === ï¿½Hï¿½ï¿½ï¿½Iï¿½ï¿½ï¿½ï¿½ï¿½Ì”ï¿½ï¿½f ===
+    Dim ï¿½Hï¿½ï¿½ï¿½yï¿½A As Variant
+    ï¿½Hï¿½ï¿½ï¿½yï¿½A = Array( _
+        Array("ï¿½Iï¿½@", "ï¿½ÏXï¿½ï¿½ï¿½eï¿½A", "ï¿½Iï¿½A"), _
+        Array("ï¿½Iï¿½A", "ï¿½ÏXï¿½ï¿½ï¿½eï¿½B", "ï¿½Iï¿½B"), _
+        Array("ï¿½Iï¿½B", "ï¿½ÏXï¿½ï¿½ï¿½eï¿½C", "ï¿½Iï¿½C"), _
+        Array("ï¿½Ia", "ï¿½ÏXï¿½ï¿½ï¿½eb", "ï¿½Ib"), _
+        Array("ï¿½Ib", "ï¿½ÏXï¿½ï¿½ï¿½ec", "ï¿½Ic"), _
+        Array("ï¿½Ic", "ï¿½ÏXï¿½ï¿½ï¿½ed", "ï¿½Id") _
     )
-    For i = LBound(HŠúƒyƒA) To UBound(HŠúƒyƒA)
-        If colMap.Exists(HŠúƒyƒA(i)(0)) And colMap.Exists(HŠúƒyƒA(i)(1)) And colMap.Exists(HŠúƒyƒA(i)(2)) Then
-            srcCol = colMap(HŠúƒyƒA(i)(0))
-            condCol = colMap(HŠúƒyƒA(i)(1))
-            destCol = colMap(HŠúƒyƒA(i)(2))
+    For i = LBound(ï¿½Hï¿½ï¿½ï¿½yï¿½A) To UBound(ï¿½Hï¿½ï¿½ï¿½yï¿½A)
+        If colMap.Exists(ï¿½Hï¿½ï¿½ï¿½yï¿½A(i)(0)) And colMap.Exists(ï¿½Hï¿½ï¿½ï¿½yï¿½A(i)(1)) And colMap.Exists(ï¿½Hï¿½ï¿½ï¿½yï¿½A(i)(2)) Then
+            srcCol = colMap(ï¿½Hï¿½ï¿½ï¿½yï¿½A(i)(0))
+            condCol = colMap(ï¿½Hï¿½ï¿½ï¿½yï¿½A(i)(1))
+            destCol = colMap(ï¿½Hï¿½ï¿½ï¿½yï¿½A(i)(2))
             If Not Intersect(Target, Me.Range(Me.Cells(4, condCol), Me.Cells(Rows.Count, condCol).End(xlUp))) Is Nothing Then
                 For Each cell In Intersect(Target, Me.Range(Me.Cells(4, condCol), Me.Cells(Rows.Count, condCol).End(xlUp)))
                     row = cell.row
                     val = Trim(cell.value)
-                    If val = "" Or val = "HŠú‰„Šú" Then
+                    If val = "" Or val = "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½ï¿½" Then
                         Me.Cells(row, destCol).value = ""
                     Else
                         Me.Cells(row, destCol).value = Me.Cells(row, srcCol).value
@@ -147,15 +170,15 @@ Private Sub Worksheet_Change(ByVal Target As Range)
         End If
     Next i
 
-    ' === •ÏX“à—e•ŠÛXŒJ‰z‚ğ‚Ü‚Æ‚ß‚Ä”½‰f ===
-    Dim ƒpƒ^[ƒ“ As Variant
-    ƒpƒ^[ƒ“ = Array( _
-      Array("•ÏX“à—e‡A", "Â–±•‰’SŠz‡@", "Â–±•‰’SŠz‡A", "•ÏXŠz‡A", "İŒv‹àŠz‡@", "İŒv‹àŠz‡A", "H–“à—e‡@", "H–“à—e‡A", "•â•‘ÎÛŠz‡@", "•â•‘ÎÛŠz‡A", "‘”ï—¦‡@", "‘”ï—¦‡A", "•â•Šz‡@", "•â•Šz‡A", "’Ps‡@", "’Ps‡A", "‡@"), _
-      Array("•ÏX“à—e‡B", "Â–±•‰’SŠz‡A", "Â–±•‰’SŠz‡B", "•ÏXŠz‡B", "İŒv‹àŠz‡A", "İŒv‹àŠz‡B", "H–“à—e‡A", "H–“à—e‡B", "•â•‘ÎÛŠz‡A", "•â•‘ÎÛŠz‡B", "‘”ï—¦‡A", "‘”ï—¦‡B", "•â•Šz‡A", "•â•Šz‡B", "’Ps‡A", "’Ps‡B", "‡A"), _
-      Array("•ÏX“à—e‡C", "Â–±•‰’SŠz‡B", "Â–±•‰’SŠz‡C", "•ÏXŠz‡C", "İŒv‹àŠz‡B", "İŒv‹àŠz‡C", "H–“à—e‡B", "H–“à—e‡C", "•â•‘ÎÛŠz‡B", "•â•‘ÎÛŠz‡C", "‘”ï—¦‡B", "‘”ï—¦‡C", "•â•Šz‡B", "•â•Šz‡C", "’Ps‡B", "’Ps‡C", "‡B"), _
-      Array("•ÏX“à—eb", "Â–±•‰’SŠza", "Â–±•‰’SŠzb", "•ÏXŠzb", "İŒv‹àŠza", "İŒv‹àŠzb", "H–“à—ea", "H–“à—eb", "•â•‘ÎÛŠza", "•â•‘ÎÛŠzb", "‘”ï—¦a", "‘”ï—¦b", "•â•Šza", "•â•Šzb", "’Psa", "’Psb", "a"), _
-      Array("•ÏX“à—ec", "Â–±•‰’SŠzb", "Â–±•‰’SŠzc", "•ÏXŠzc", "İŒv‹àŠzb", "İŒv‹àŠzc", "H–“à—eb", "H–“à—ec", "•â•‘ÎÛŠzb", "•â•‘ÎÛŠzc", "‘”ï—¦b", "‘”ï—¦c", "•â•Šzb", "•â•Šzc", "’Psb", "’Psc", "b"), _
-      Array("•ÏX“à—ed", "Â–±•‰’SŠzc", "Â–±•‰’SŠzd", "•ÏXŠzd", "İŒv‹àŠzc", "İŒv‹àŠzd", "H–“à—ec", "H–“à—ed", "•â•‘ÎÛŠzc", "•â•‘ÎÛŠzd", "‘”ï—¦c", "‘”ï—¦d", "•â•Šzc", "•â•Šzd", "’Psc", "’Psd", "c") _
+    ' === ï¿½ÏXï¿½ï¿½ï¿½eï¿½ï¿½ï¿½ÛXï¿½Jï¿½zï¿½ï¿½ï¿½Ü‚Æ‚ß‚Ä”ï¿½ï¿½f ===
+    Dim ï¿½pï¿½^ï¿½[ï¿½ï¿½ As Variant
+    ï¿½pï¿½^ï¿½[ï¿½ï¿½ = Array( _
+      Array("ï¿½ÏXï¿½ï¿½ï¿½eï¿½A", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zï¿½@", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zï¿½A", "ï¿½ÏXï¿½zï¿½A", "ï¿½İŒvï¿½ï¿½ï¿½zï¿½@", "ï¿½İŒvï¿½ï¿½ï¿½zï¿½A", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½eï¿½@", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½eï¿½A", "ï¿½â•ï¿½ÎÛŠzï¿½@", "ï¿½â•ï¿½ÎÛŠzï¿½A", "ï¿½ï¿½ï¿½ï—¦ï¿½@", "ï¿½ï¿½ï¿½ï—¦ï¿½A", "ï¿½â•ï¿½zï¿½@", "ï¿½â•ï¿½zï¿½A", "ï¿½Pï¿½sï¿½@", "ï¿½Pï¿½sï¿½A", "ï¿½@"), _
+      Array("ï¿½ÏXï¿½ï¿½ï¿½eï¿½B", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zï¿½A", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zï¿½B", "ï¿½ÏXï¿½zï¿½B", "ï¿½İŒvï¿½ï¿½ï¿½zï¿½A", "ï¿½İŒvï¿½ï¿½ï¿½zï¿½B", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½eï¿½A", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½eï¿½B", "ï¿½â•ï¿½ÎÛŠzï¿½A", "ï¿½â•ï¿½ÎÛŠzï¿½B", "ï¿½ï¿½ï¿½ï—¦ï¿½A", "ï¿½ï¿½ï¿½ï—¦ï¿½B", "ï¿½â•ï¿½zï¿½A", "ï¿½â•ï¿½zï¿½B", "ï¿½Pï¿½sï¿½A", "ï¿½Pï¿½sï¿½B", "ï¿½A"), _
+      Array("ï¿½ÏXï¿½ï¿½ï¿½eï¿½C", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zï¿½B", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zï¿½C", "ï¿½ÏXï¿½zï¿½C", "ï¿½İŒvï¿½ï¿½ï¿½zï¿½B", "ï¿½İŒvï¿½ï¿½ï¿½zï¿½C", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½eï¿½B", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½eï¿½C", "ï¿½â•ï¿½ÎÛŠzï¿½B", "ï¿½â•ï¿½ÎÛŠzï¿½C", "ï¿½ï¿½ï¿½ï—¦ï¿½B", "ï¿½ï¿½ï¿½ï—¦ï¿½C", "ï¿½â•ï¿½zï¿½B", "ï¿½â•ï¿½zï¿½C", "ï¿½Pï¿½sï¿½B", "ï¿½Pï¿½sï¿½C", "ï¿½B"), _
+      Array("ï¿½ÏXï¿½ï¿½ï¿½eb", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½za", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zb", "ï¿½ÏXï¿½zb", "ï¿½İŒvï¿½ï¿½ï¿½za", "ï¿½İŒvï¿½ï¿½ï¿½zb", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½ea", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½eb", "ï¿½â•ï¿½ÎÛŠza", "ï¿½â•ï¿½ÎÛŠzb", "ï¿½ï¿½ï¿½ï—¦a", "ï¿½ï¿½ï¿½ï—¦b", "ï¿½â•ï¿½za", "ï¿½â•ï¿½zb", "ï¿½Pï¿½sa", "ï¿½Pï¿½sb", "a"), _
+      Array("ï¿½ÏXï¿½ï¿½ï¿½ec", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zb", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zc", "ï¿½ÏXï¿½zc", "ï¿½İŒvï¿½ï¿½ï¿½zb", "ï¿½İŒvï¿½ï¿½ï¿½zc", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½eb", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½ec", "ï¿½â•ï¿½ÎÛŠzb", "ï¿½â•ï¿½ÎÛŠzc", "ï¿½ï¿½ï¿½ï—¦b", "ï¿½ï¿½ï¿½ï—¦c", "ï¿½â•ï¿½zb", "ï¿½â•ï¿½zc", "ï¿½Pï¿½sb", "ï¿½Pï¿½sc", "b"), _
+      Array("ï¿½ÏXï¿½ï¿½ï¿½ed", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zc", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zd", "ï¿½ÏXï¿½zd", "ï¿½İŒvï¿½ï¿½ï¿½zc", "ï¿½İŒvï¿½ï¿½ï¿½zd", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½ec", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½ed", "ï¿½â•ï¿½ÎÛŠzc", "ï¿½â•ï¿½ÎÛŠzd", "ï¿½ï¿½ï¿½ï—¦c", "ï¿½ï¿½ï¿½ï—¦d", "ï¿½â•ï¿½zc", "ï¿½â•ï¿½zd", "ï¿½Pï¿½sc", "ï¿½Pï¿½sd", "c") _
     )
 
     Dim condName As String, fromName As String, toName As String, changeName As String
@@ -164,24 +187,24 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Dim amt3From As String, amt3To As String, amt4From As String, amt4To As String
     Dim suffixFrom As String
 
-    For i = LBound(ƒpƒ^[ƒ“) To UBound(ƒpƒ^[ƒ“)
-        condName = ƒpƒ^[ƒ“(i)(0)
-        fromName = ƒpƒ^[ƒ“(i)(1)
-        toName = ƒpƒ^[ƒ“(i)(2)
-        changeName = ƒpƒ^[ƒ“(i)(3)
-        designFrom = ƒpƒ^[ƒ“(i)(4)
-        designTo = ƒpƒ^[ƒ“(i)(5)
-        workFrom = ƒpƒ^[ƒ“(i)(6)
-        workTo = ƒpƒ^[ƒ“(i)(7)
-        amt1From = ƒpƒ^[ƒ“(i)(8)
-        amt1To = ƒpƒ^[ƒ“(i)(9)
-        amt2From = ƒpƒ^[ƒ“(i)(10)
-        amt2To = ƒpƒ^[ƒ“(i)(11)
-        amt3From = ƒpƒ^[ƒ“(i)(12)
-        amt3To = ƒpƒ^[ƒ“(i)(13)
-        amt4From = ƒpƒ^[ƒ“(i)(14)
-        amt4To = ƒpƒ^[ƒ“(i)(15)
-        suffixFrom = ƒpƒ^[ƒ“(i)(16)
+    For i = LBound(ï¿½pï¿½^ï¿½[ï¿½ï¿½) To UBound(ï¿½pï¿½^ï¿½[ï¿½ï¿½)
+        condName = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(0)
+        fromName = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(1)
+        toName = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(2)
+        changeName = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(3)
+        designFrom = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(4)
+        designTo = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(5)
+        workFrom = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(6)
+        workTo = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(7)
+        amt1From = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(8)
+        amt1To = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(9)
+        amt2From = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(10)
+        amt2To = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(11)
+        amt3From = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(12)
+        amt3To = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(13)
+        amt4From = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(14)
+        amt4To = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(15)
+        suffixFrom = ï¿½pï¿½^ï¿½[ï¿½ï¿½(i)(16)
 
         If colMap.Exists(condName) Then
             condCol = colMap(condName)
@@ -191,21 +214,21 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                     val = Trim(cell.value)
 
                     Select Case val
-                        Case "‘Šz•ÏX", "ƒCƒ“ƒtƒŒƒXƒ‰ƒCƒh"
+                        Case "ï¿½ï¿½ï¿½zï¿½ÏX", "ï¿½Cï¿½ï¿½ï¿½tï¿½ï¿½ï¿½Xï¿½ï¿½ï¿½Cï¿½h"
                             If IsNumeric(Me.Cells(row, colMap(fromName)).value) And IsNumeric(Me.Cells(row, colMap(changeName)).value) Then
                                 Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value + Me.Cells(row, colMap(changeName)).value
                             Else
                                 Me.Cells(row, colMap(toName)).value = ""
                             End If
 
-                        Case "Œ¸Šz•ÏX"
+                        Case "ï¿½ï¿½ï¿½zï¿½ÏX"
                             If IsNumeric(Me.Cells(row, colMap(fromName)).value) And IsNumeric(Me.Cells(row, colMap(changeName)).value) Then
                                 Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value - Me.Cells(row, colMap(changeName)).value
                             Else
                                 Me.Cells(row, colMap(toName)).value = ""
                             End If
 
-                        Case "HŠú‰„Šú"
+                        Case "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½ï¿½"
                             Me.Cells(row, colMap(changeName)).value = 0
                             Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value
                             Me.Cells(row, colMap(designTo)).value = Me.Cells(row, colMap(designFrom)).value
@@ -215,7 +238,7 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                             Me.Cells(row, colMap(amt3To)).value = Me.Cells(row, colMap(amt3From)).value
                             Me.Cells(row, colMap(amt4To)).value = Me.Cells(row, colMap(amt4From)).value
 
-                        Case "Œy”÷•ÏX"
+                        Case "ï¿½yï¿½ï¿½ï¿½ÏX"
                             Me.Cells(row, colMap(toName)).value = Me.Cells(row, colMap(fromName)).value
                             Me.Cells(row, colMap(designTo)).value = Me.Cells(row, colMap(designFrom)).value
                             Me.Cells(row, colMap(workTo)).value = ""
@@ -225,7 +248,7 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                             Me.Cells(row, colMap(amt4To)).value = Me.Cells(row, colMap(amt4From)).value
                             Me.Cells(row, colMap(changeName)).value = ""
 
-                        Case "ŠÛXŒJ‰z", "‘O‹à•¥ŒãŒJ‰z"
+                        Case "ï¿½ÛXï¿½Jï¿½z", "ï¿½Oï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Jï¿½z"
                             Dim clearCols As Variant: clearCols = Array(changeName, toName, designTo, amt1To, amt2To, amt3To, amt4To)
                             Dim cname As Variant
                             For Each cname In clearCols
@@ -237,7 +260,7 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                                 Me.Cells(row, colMap(workTo)).value = Me.Cells(row, colMap(workFrom)).value
                             End If
                             Dim fld As Variant
-                            For Each fld In Array("n", "I", "İŒv‹àŠz", "Â–±•‰’SŠz", "•â•‘ÎÛŠz", "‘”ï—¦", "•â•Šz", "’Ps", "H–“à—e")
+                            For Each fld In Array("ï¿½n", "ï¿½I", "ï¿½İŒvï¿½ï¿½ï¿½z", "ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½z", "ï¿½â•ï¿½ÎÛŠz", "ï¿½ï¿½ï¿½ï—¦", "ï¿½â•ï¿½z", "ï¿½Pï¿½s", "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½e")
                                 If colMap.Exists(fld & suffixFrom) And colMap.Exists(fld & "a") Then
                                     Me.Cells(row, colMap(fld & "a")).value = Me.Cells(row, colMap(fld & suffixFrom)).value
                                 End If
@@ -255,8 +278,8 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                     End Select
 
 
-' ’Ps = Â–±•‰’SŠz - •â•‘ÎÛŠz
-If val = "‘Šz•ÏX" Or val = "Œ¸Šz•ÏX" Or val = "HŠú‰„Šú" Or val = "Œy”÷•ÏX" Or val = "ƒCƒ“ƒtƒŒƒXƒ‰ƒCƒh" Then
+' ï¿½Pï¿½s = ï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½z - ï¿½â•ï¿½ÎÛŠz
+If val = "ï¿½ï¿½ï¿½zï¿½ÏX" Or val = "ï¿½ï¿½ï¿½zï¿½ÏX" Or val = "ï¿½Hï¿½ï¿½ï¿½ï¿½ï¿½ï¿½" Or val = "ï¿½yï¿½ï¿½ï¿½ÏX" Or val = "ï¿½Cï¿½ï¿½ï¿½tï¿½ï¿½ï¿½Xï¿½ï¿½ï¿½Cï¿½h" Then
     If colMap.Exists(toName) And colMap.Exists(amt1To) And colMap.Exists(amt4To) Then
         If IsNumeric(Me.Cells(row, colMap(toName)).value) And IsNumeric(Me.Cells(row, colMap(amt1To)).value) Then
             Me.Cells(row, colMap(amt4To)).value = Me.Cells(row, colMap(toName)).value - Me.Cells(row, colMap(amt1To)).value
@@ -271,29 +294,29 @@ End If
         End If
     Next i
 
-    ' === W—ñ‚Ü‚½‚ÍX—ñ‚ª•ÏX‚³‚ê‚½‚Æ‚«FA—ñ‚ÉƒRƒƒ“ƒg‚ğ•\¦ ===
-    If colMap.Exists("ÅIÂ–±•‰’SŠzi‡Œvj") And colMap.Exists("•â•‘ÎÛŠzi–‹Æ”ïƒx[ƒXj") Then
-        Dim Â–±—ñ As Long, •â•—ñ As Long
-        Â–±—ñ = colMap("ÅIÂ–±•‰’SŠzi‡Œvj")
-        •â•—ñ = colMap("•â•‘ÎÛŠzi–‹Æ”ïƒx[ƒXj")
+    ' === Wï¿½ï¿½Ü‚ï¿½ï¿½ï¿½Xï¿½ñ‚ª•ÏXï¿½ï¿½ï¿½ê‚½ï¿½Æ‚ï¿½ï¿½FAï¿½ï¿½ÉƒRï¿½ï¿½ï¿½ï¿½ï¿½gï¿½ï¿½\ï¿½ï¿½ ===
+    If colMap.Exists("ï¿½ÅIï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zï¿½iï¿½ï¿½ï¿½vï¿½j") And colMap.Exists("ï¿½â•ï¿½ÎÛŠzï¿½iï¿½ï¿½ï¿½Æ”ï¿½xï¿½[ï¿½Xï¿½j") Then
+        Dim ï¿½Â–ï¿½ï¿½ï¿½ As Long, ï¿½â•ï¿½ï¿½ As Long
+        ï¿½Â–ï¿½ï¿½ï¿½ = colMap("ï¿½ÅIï¿½Â–ï¿½ï¿½ï¿½ï¿½Sï¿½zï¿½iï¿½ï¿½ï¿½vï¿½j")
+        ï¿½â•ï¿½ï¿½ = colMap("ï¿½â•ï¿½ÎÛŠzï¿½iï¿½ï¿½ï¿½Æ”ï¿½xï¿½[ï¿½Xï¿½j")
 
-        If Not Intersect(Target, Me.Columns(Â–±—ñ)) Is Nothing Or Not Intersect(Target, Me.Columns(•â•—ñ)) Is Nothing Then
+        If Not Intersect(Target, Me.Columns(ï¿½Â–ï¿½ï¿½ï¿½)) Is Nothing Or Not Intersect(Target, Me.Columns(ï¿½â•ï¿½ï¿½)) Is Nothing Then
             For Each cell In Target
                 row = cell.row
                 If row >= 4 Then
-                    Dim valW As Variant, valX As Variant, ƒRƒƒ“ƒg“à—e As String
-                    valW = Me.Cells(row, Â–±—ñ).value
-                    valX = Me.Cells(row, •â•—ñ).value
+                    Dim valW As Variant, valX As Variant, ï¿½Rï¿½ï¿½ï¿½ï¿½ï¿½gï¿½ï¿½ï¿½e As String
+                    valW = Me.Cells(row, ï¿½Â–ï¿½ï¿½ï¿½).value
+                    valX = Me.Cells(row, ï¿½â•ï¿½ï¿½).value
 
-                    With Me.Cells(row, 1) ' A—ñ
-                        ' Šù‘¶ƒRƒƒ“ƒgíœ
+                    With Me.Cells(row, 1) ' Aï¿½ï¿½
+                        ' ï¿½ï¿½ï¿½ï¿½ï¿½Rï¿½ï¿½ï¿½ï¿½ï¿½gï¿½íœ
                         If Not .Comment Is Nothing Then .Comment.Delete
 
-                        ' —¼•û‚É’l‚ª‚ ‚ê‚ÎƒRƒƒ“ƒg’Ç‰Á
+                        ' ï¿½ï¿½ï¿½ï¿½ï¿½É’lï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÎƒRï¿½ï¿½ï¿½ï¿½ï¿½gï¿½Ç‰ï¿½
                         If valW <> "" And valX <> "" Then
-                            ƒRƒƒ“ƒg“à—e = "ÅIÂ–±F" & Format(valW, "#,##0") & "‰~" & vbCrLf & _
-                                           "•â•‘ÎÛF" & Format(valX, "#,##0") & "‰~"
-                            .AddComment Text:=ƒRƒƒ“ƒg“à—e
+                            ï¿½Rï¿½ï¿½ï¿½ï¿½ï¿½gï¿½ï¿½ï¿½e = "ï¿½ÅIï¿½Â–ï¿½ï¿½F" & Format(valW, "#,##0") & "ï¿½~" & vbCrLf & _
+                                           "ï¿½â•ï¿½ÎÛF" & Format(valX, "#,##0") & "ï¿½~"
+                            .AddComment Text:=ï¿½Rï¿½ï¿½ï¿½ï¿½ï¿½gï¿½ï¿½ï¿½e
                         End If
                     End With
                 End If
@@ -301,7 +324,7 @@ End If
         End If
     End If
 
-    ' === ŒûÀ–¼‹`EŒûÀ–¼‹`2—ñ‚ª•ÏX‚³‚ê‚½‚Æ‚«F©“®³‹K‰» ===
+    ' === ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½`ï¿½Eï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½`2ï¿½ñ‚ª•ÏXï¿½ï¿½ï¿½ê‚½ï¿½Æ‚ï¿½ï¿½Fï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Kï¿½ï¿½ ===
     Call HandleAccountNormalize(Me, Target)
 
 CleanExit:
@@ -310,12 +333,12 @@ CleanExit:
 
 
 ErrorHandler:
-    MsgBox "ƒGƒ‰[‚ª”­¶‚µ‚Ü‚µ‚½F" & Err.Description, vbExclamation
+    MsgBox "ï¿½Gï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü‚ï¿½ï¿½ï¿½ï¿½F" & Err.Description, vbExclamation
     Resume CleanExit
 End Sub
 
 '---------------------------------------------
-' ‘I‘ğ•ÏXF1s–Ú‚Ì’Ê‚µ”Ô†‚ÆŒ©o‚µ—ñ”‚ğ”äŠr‚µAƒYƒŒ‚Ä‚¢‚½‚çXV
+' ï¿½Iï¿½ï¿½ÏXï¿½ï¿½ï¿½F1ï¿½sï¿½Ú‚Ì’Ê‚ï¿½ï¿½Ôï¿½ï¿½ÆŒï¿½ï¿½oï¿½ï¿½ï¿½ñ”‚ï¿½ï¿½rï¿½ï¿½ï¿½Aï¿½Yï¿½ï¿½ï¿½Ä‚ï¿½ï¿½ï¿½ï¿½ï¿½Xï¿½V
 '---------------------------------------------
 Private Sub Worksheet_SelectionChange(ByVal Target As Range)
     Dim lastCol As Long
@@ -324,10 +347,10 @@ Private Sub Worksheet_SelectionChange(ByVal Target As Range)
     
     On Error Resume Next
     
-    ' Œ©o‚µsi3s–Új‚ÌÅI—ñ‚ğæ“¾
+    ' ï¿½ï¿½ï¿½oï¿½ï¿½ï¿½sï¿½i3ï¿½sï¿½Újï¿½ÌÅIï¿½ï¿½ï¿½ï¿½æ“¾
     lastCol = Me.Cells(3, Me.Columns.Count).End(xlToLeft).Column
     
-    ' 1s–Ú‚ÌÅI—ñ‚Ì’l‚ğæ“¾i‹ó‚Ìê‡‚Í0j
+    ' 1ï¿½sï¿½Ú‚ÌÅIï¿½ï¿½Ì’lï¿½ï¿½ï¿½æ“¾ï¿½iï¿½ï¿½Ìê‡ï¿½ï¿½0ï¿½j
     lastColInRow1 = 0
     If lastCol > 0 Then
         If IsNumeric(Me.Cells(1, lastCol).value) Then
@@ -335,8 +358,8 @@ Private Sub Worksheet_SelectionChange(ByVal Target As Range)
         End If
     End If
     
-    ' Œ©o‚µ—ñ”‚Æ1s–Ú‚Ì’Ê‚µ”Ô†‚ªˆê’v‚µ‚Ä‚¢‚È‚¢ê‡AXV
-    ' === C³ƒ|ƒCƒ“ƒg‡AFRefreshColumnNumbersÀs‚ÍƒCƒxƒ“ƒg‚ğOFF‚É‚µ‚Ä–³ŒÀƒ‹[ƒv‚ğ–h~ ===
+    ' ï¿½ï¿½ï¿½oï¿½ï¿½ï¿½ñ”‚ï¿½1ï¿½sï¿½Ú‚Ì’Ê‚ï¿½ï¿½Ôï¿½ï¿½ï¿½ï¿½ï¿½vï¿½ï¿½ï¿½Ä‚ï¿½ï¿½È‚ï¿½ï¿½ê‡ï¿½Aï¿½Xï¿½V
+    ' === ï¿½Cï¿½ï¿½ï¿½|ï¿½Cï¿½ï¿½ï¿½gï¿½Aï¿½FRefreshColumnNumbersï¿½ï¿½ï¿½sï¿½ï¿½ï¿½ÍƒCï¿½xï¿½ï¿½ï¿½gï¿½ï¿½OFFï¿½É‚ï¿½ï¿½Ä–ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½[ï¿½vï¿½ï¿½hï¿½~ ===
     If lastCol <> lastColInRow1 Then
         eventsBefore = Application.EnableEvents
         Application.EnableEvents = False
@@ -347,23 +370,23 @@ Private Sub Worksheet_SelectionChange(ByVal Target As Range)
     On Error GoTo 0
 End Sub
 
-' ===== ‚±‚±‚©‚çƒwƒ‹ƒp[i•\ƒV[ƒg‚Ì End Sub ‚ÌŒã‚ë‚É’u‚­j=====
+' ===== ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½wï¿½ï¿½ï¿½pï¿½[ï¿½iï¿½\ï¿½Vï¿½[ï¿½gï¿½ï¿½ End Sub ï¿½ÌŒï¿½ï¿½É’uï¿½ï¿½ï¿½j=====
 
 '---------------------------------------------
-' 1s–Ú‚Ì’Ê‚µ”Ô†‚ğU‚è’¼‚·iŒ©o‚µs‚ÌÅI—ñ‚Ü‚Åj
+' 1ï¿½sï¿½Ú‚Ì’Ê‚ï¿½ï¿½Ôï¿½ï¿½ï¿½Uï¿½è’¼ï¿½ï¿½ï¿½iï¿½ï¿½ï¿½oï¿½ï¿½ï¿½sï¿½ÌÅIï¿½ï¿½Ü‚Åj
 '---------------------------------------------
 Private Sub RefreshColumnNumbers()
     Dim lastCol As Long
     Dim c As Long
     
-    ' Œ©o‚µsi3s–Új‚ÌÅI—ñ‚ğæ“¾
+    ' ï¿½ï¿½ï¿½oï¿½ï¿½ï¿½sï¿½i3ï¿½sï¿½Újï¿½ÌÅIï¿½ï¿½ï¿½ï¿½æ“¾
     lastCol = Me.Cells(3, Me.Columns.Count).End(xlToLeft).Column
     
-    ' 1s–Ú‚ÌA—ñ`lastCol—ñ‚ğƒNƒŠƒA
+    ' 1ï¿½sï¿½Ú‚ï¿½Aï¿½ï¿½`lastColï¿½ï¿½ï¿½ï¿½Nï¿½ï¿½ï¿½A
     If lastCol > 0 Then
         Me.Range(Me.Cells(1, 1), Me.Cells(1, lastCol)).ClearContents
         
-        ' ’Ê‚µ”Ô†‚ğİ’èi’l‚Ì‚İAŠÖ”‚Íg‚í‚È‚¢j
+        ' ï¿½Ê‚ï¿½ï¿½Ôï¿½ï¿½ï¿½İ’ï¿½iï¿½lï¿½Ì‚İAï¿½Öï¿½ï¿½Ígï¿½ï¿½È‚ï¿½ï¿½j
         For c = 1 To lastCol
             Me.Cells(1, c).value = c
         Next c
@@ -374,23 +397,23 @@ Public Function NormalizeHeader(ByVal s As String) As String
     s = Replace(s, vbCr, "")
     s = Replace(s, vbLf, "")
     s = Replace(s, """", "")
-    s = Replace(s, "@", " ")
-    s = Replace(s, "i", "("): s = Replace(s, "j", ")")
-    s = Replace(s, "k", "["): s = Replace(s, "l", "]")
+    s = Replace(s, "ï¿½@", " ")
+    s = Replace(s, "ï¿½i", "("): s = Replace(s, "ï¿½j", ")")
+    s = Replace(s, "ï¿½k", "["): s = Replace(s, "ï¿½l", "]")
     s = Application.Trim(s)
     NormalizeHeader = s
 End Function
 
 Public Function ColFrom(ByVal colMap As Object, ParamArray names() As Variant) As Long
     Dim i As Long, key As Variant
-    ' 1) Š®‘Sˆê’v
+    ' 1) ï¿½ï¿½ï¿½Sï¿½ï¿½v
     For i = LBound(names) To UBound(names)
         If colMap.Exists(CStr(names(i))) Then
             ColFrom = colMap(CStr(names(i)))
             Exit Function
         End If
     Next i
-    ' 2) ³‹K‰»‚µ‚Äˆê’v
+    ' 2) ï¿½ï¿½ï¿½Kï¿½ï¿½ï¿½ï¿½ï¿½Äˆï¿½v
     For Each key In colMap.Keys
         For i = LBound(names) To UBound(names)
             If NormalizeHeader(CStr(key)) = NormalizeHeader(CStr(names(i))) Then
@@ -403,7 +426,7 @@ Public Function ColFrom(ByVal colMap As Object, ParamArray names() As Variant) A
 End Function
 
 Public Function NormName(ByVal s As String) As String
-    s = Replace(s, "@", " ")
+    s = Replace(s, "ï¿½@", " ")
     s = Replace(s, vbCr, "")
     s = Replace(s, vbLf, "")
     s = Application.Trim(s)
@@ -411,7 +434,7 @@ Public Function NormName(ByVal s As String) As String
 End Function
 
 Public Sub GetLatestRepAddr(ws As Worksheet, headerRow As Long, _
-    col‹ÆÒ As Long, col‹NˆÄ“ú As Long, col‘ã•\Ò As Long, colZŠ As Long, _
+    colï¿½Æï¿½ As Long, colï¿½Nï¿½Ä“ï¿½ As Long, colï¿½ï¿½\ï¿½ï¿½ As Long, colï¿½Zï¿½ï¿½ As Long, _
     currentRow As Long, key As String, rep As String, addr As String)
 
     Dim lastRow As Long, r As Long
@@ -419,24 +442,24 @@ Public Sub GetLatestRepAddr(ws As Worksheet, headerRow As Long, _
     Dim repAny As String, addrAny As String
 
     rep = "": addr = "": maxDateAny = 0: maxDateFilled = 0
-    lastRow = ws.Cells(ws.Rows.Count, col‹ÆÒ).End(xlUp).row
+    lastRow = ws.Cells(ws.Rows.Count, colï¿½Æï¿½).End(xlUp).row
 
     For r = headerRow + 1 To lastRow
         If r <> currentRow Then
-            If NormName(CStr(ws.Cells(r, col‹ÆÒ).value)) = NormName(key) Then
-                If IsDate(ws.Cells(r, col‹NˆÄ“ú).value) Then
-                    Dim d As Date: d = ws.Cells(r, col‹NˆÄ“ú).value
-                    Dim repTmp As String: repTmp = CStr(ws.Cells(r, col‘ã•\Ò).value)
-                    Dim addrTmp As String: addrTmp = CStr(ws.Cells(r, colZŠ).value)
+            If NormName(CStr(ws.Cells(r, colï¿½Æï¿½).value)) = NormName(key) Then
+                If IsDate(ws.Cells(r, colï¿½Nï¿½Ä“ï¿½).value) Then
+                    Dim d As Date: d = ws.Cells(r, colï¿½Nï¿½Ä“ï¿½).value
+                    Dim repTmp As String: repTmp = CStr(ws.Cells(r, colï¿½ï¿½\ï¿½ï¿½).value)
+                    Dim addrTmp As String: addrTmp = CStr(ws.Cells(r, colï¿½Zï¿½ï¿½).value)
 
-                    ' ÅVi’†g‹ó‚Å‚àXVj
+                    ' ï¿½ÅVï¿½iï¿½ï¿½ï¿½gï¿½ï¿½Å‚ï¿½ï¿½Xï¿½Vï¿½j
                     If d > maxDateAny Then
                         maxDateAny = d
                         repAny = repTmp
                         addrAny = addrTmp
                     End If
 
-                    ' u‘ã•\ÒorZŠ‚Ì‚Ç‚¿‚ç‚©“ü‚Á‚Ä‚¢‚évÅV
+                    ' ï¿½uï¿½ï¿½\ï¿½ï¿½orï¿½Zï¿½ï¿½ï¿½Ì‚Ç‚ï¿½ï¿½ç‚©ï¿½ï¿½ï¿½ï¿½ï¿½Ä‚ï¿½ï¿½ï¿½vï¿½ÅV
                     If (repTmp <> "" Or addrTmp <> "") And d > maxDateFilled Then
                         maxDateFilled = d
                         rep = repTmp
@@ -447,7 +470,7 @@ Public Sub GetLatestRepAddr(ws As Worksheet, headerRow As Long, _
         End If
     Next r
 
-    ' ‚Ç‚¿‚ç‚à‹ó‚¾‚Á‚½ê‡‚ÍÅVs‚Ì’li‹ó‚Ì‰Â”\«‚à‚ ‚éj‚ÅƒtƒH[ƒ‹ƒoƒbƒN
+    ' ï¿½Ç‚ï¿½ï¿½ï¿½ï¿½ï¿½ó‚¾‚ï¿½ï¿½ï¿½ï¿½ê‡ï¿½ÍÅVï¿½sï¿½Ì’lï¿½iï¿½ï¿½Ì‰Â”\ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½jï¿½Åƒtï¿½Hï¿½[ï¿½ï¿½ï¿½oï¿½bï¿½N
     If rep = "" And addr = "" Then
         rep = repAny: addr = addrAny
     End If
