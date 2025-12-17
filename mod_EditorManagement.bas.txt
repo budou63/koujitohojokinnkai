@@ -26,20 +26,13 @@ Public Sub HandleEditorOnChange(ByVal ws表 As Worksheet, ByVal Target As Range,
     editorCol = GetLastEditorColumn(ws表, colMap, headerRow)
     If editorCol = 0 Then GoTo CleanExit
 
-    ' ③ 入力系列列の編集が含まれる行だけを対象にする
+    ' ③ データ行（4行目以降）で編集された行を全て対象にする（入力系列列の判定を撤廃）
     Dim dataRange As Range
     Set dataRange = Intersect(Target, ws表.Rows(headerRow + 1 & ":" & ws表.Rows.Count))
     If dataRange Is Nothing Then GoTo CleanExit
 
-    Dim inputCols As Object
-    Set inputCols = BuildInputColumns(ws表, colMap, headerRow)
-
-    Dim inputEdited As Range
-    Set inputEdited = GetEditedInputRange(ws表, dataRange, inputCols)
-    If inputEdited Is Nothing Then GoTo CleanExit
-
     Dim affectedRows As Range
-    Set affectedRows = inputEdited.EntireRow
+    Set affectedRows = dataRange.EntireRow
 
     ' ④ 表シートの対象行に表示名を書き込む
     Dim dispName As String
