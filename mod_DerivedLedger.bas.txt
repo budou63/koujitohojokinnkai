@@ -1,0 +1,497 @@
+Attribute VB_Name = "mod_DerivedLedger"
+Option Explicit
+
+'==========================
+' 派生台帳_収用 作成メイン
+'==========================
+Public Sub CreateDerivedLedger_Shuyou()
+    Const BASE_SHEET_NAME As String = "表"
+    Const OUTPUT_SHEET_NAME As String = "派生台帳_収用"
+    Const HEADER_ROW As Long = 3
+    Const DATA_START_ROW As Long = 4
+    
+    Dim wb As Workbook
+    Dim wsBase As Worksheet
+    Dim wsOut As Worksheet
+    Dim lastRow As Long, lastCol As Long
+    Dim dataArr As Variant
+    Dim headerMap As Object        ' Dictionary: 見出し名 → 列番号
+    Dim personDict As Object       ' Dictionary: 人キー → Array(優先行, 契約日数値, 起案日数値)
+    
+    Dim col_ContractDate As Long
+    Dim col_ProposalDate As Long
+    Dim col_PersonName As Long
+    Dim col_Address As Long
+    Dim col_Shuyou As Long
+    Dim col_Trigger As Long
+    
+    Dim requiredHeaders As Object  ' Dictionary: 必須ヘッダー名 → True
+    Dim hdr As Variant
+    Dim i As Long, j As Long
+    
+    Dim r As Long
+    Dim key As String
+    Dim val_Shuyou As String
+    Dim valName As String
+    Dim valAddress As String
+    Dim normName As String
+    Dim normAddress As String
+    Dim cd As Double
+    Dim pd As Double
+    Dim oldInfo As Variant
+    Dim targetRowCount As Long
+    Dim personCount As Long
+    
+    Dim outHeaders As Collection
+    Dim totalCols As Long
+    Dim outArr As Variant
+    Dim idx As Long
+    Dim bestRow As Long
+    Dim circ As String
+    Dim arrKeys() As String
+    Dim parts As Variant
+    Dim rngOut As Range
+    
+    On Error GoTo ErrHandler
+    
+    Set wb = ThisWorkbook
+    
+    '--- 基礎シート取得
+    On Error Resume Next
+    Set wsBase = wb.Worksheets(BASE_SHEET_NAME)
+    On Error GoTo ErrHandler
+    
+    If wsBase Is Nothing Then
+        MsgBox "基礎シート「" & BASE_SHEET_NAME & "」が見つかりません。", vbCritical
+        Exit Sub
+    End If
+    
+    '--- 列数（ヘッダー行）を取得
+    lastCol = wsBase.Cells(HEADER_ROW, wsBase.Columns.Count).End(xlToLeft).Column
+    
+    '--- ヘッダーマップ作成（見出し名 → 列番号）
+    Set headerMap = CreateObject("Scripting.Dictionary")
+    headerMap.CompareMode = 1 ' TextCompare（大文字小文字を区別しない）
+    
+    For j = 1 To lastCol
+        If Len(Trim$(CStr(wsBase.Cells(HEADER_ROW, j).Value))) > 0 Then
+            headerMap(Trim$(CStr(wsBase.Cells(HEADER_ROW, j).Value))) = j
+        End If
+    Next j
+    
+    '--- 必須ヘッダーの一覧を作成（重複排除）
+    Set requiredHeaders = CreateObject("Scripting.Dictionary")
+    requiredHeaders.CompareMode = 1 ' TextCompare
+    
+    ' 人キー＋抽出条件に必要なヘッダー
+    If Not requiredHeaders.Exists("施工業者・債権者") Then requiredHeaders.Add "施工業者・債権者", True
+    If Not requiredHeaders.Exists("住所") Then requiredHeaders.Add "住所", True
+    If Not requiredHeaders.Exists("収用証明書") Then requiredHeaders.Add "収用証明書", True
+    If Not requiredHeaders.Exists("契約年月日") Then requiredHeaders.Add "契約年月日", True
+    If Not requiredHeaders.Exists("起案日") Then requiredHeaders.Add "起案日", True
+    If Not requiredHeaders.Exists("転記") Then requiredHeaders.Add "転記", True
+    
+    ' 4-1 基本情報
+    If Not requiredHeaders.Exists("大事業") Then requiredHeaders.Add "大事業", True
+    If Not requiredHeaders.Exists("細々節") Then requiredHeaders.Add "細々節", True
+    If Not requiredHeaders.Exists("細々節〔繰越明許分〕") Then requiredHeaders.Add "細々節〔繰越明許分〕", True
+    If Not requiredHeaders.Exists("起案日") Then requiredHeaders.Add "起案日", True
+    If Not requiredHeaders.Exists("契約年月日") Then requiredHeaders.Add "契約年月日", True
+    If Not requiredHeaders.Exists("件名") Then requiredHeaders.Add "件名", True
+    If Not requiredHeaders.Exists("最終債務負担額（合計）") Then requiredHeaders.Add "最終債務負担額（合計）", True
+    If Not requiredHeaders.Exists("補助対象額（事業費ベース）") Then requiredHeaders.Add "補助対象額（事業費ベース）", True
+    If Not requiredHeaders.Exists("補助額（国費ベース）") Then requiredHeaders.Add "補助額（国費ベース）", True
+    If Not requiredHeaders.Exists("単市（合計）") Then requiredHeaders.Add "単市（合計）", True
+    If Not requiredHeaders.Exists("竣工年月日") Then requiredHeaders.Add "竣工年月日", True
+    If Not requiredHeaders.Exists("検査・登記確認年月日") Then requiredHeaders.Add "検査・登記確認年月日", True
+    If Not requiredHeaders.Exists("進捗状況") Then requiredHeaders.Add "進捗状況", True
+    
+    ' 4-2 用地・筆情報（①～⑩）
+    For i = 1 To 10
+        circ = GetCircledNumber(i)
+        If Not requiredHeaders.Exists("移転・補償完了日" & circ) Then requiredHeaders.Add "移転・補償完了日" & circ, True
+        If Not requiredHeaders.Exists("大字" & circ) Then requiredHeaders.Add "大字" & circ, True
+        If Not requiredHeaders.Exists("字" & circ) Then requiredHeaders.Add "字" & circ, True
+        If Not requiredHeaders.Exists("単価" & circ) Then requiredHeaders.Add "単価" & circ, True
+        If Not requiredHeaders.Exists("元地番" & circ) Then requiredHeaders.Add "元地番" & circ, True
+        If Not requiredHeaders.Exists("後地番" & circ) Then requiredHeaders.Add "後地番" & circ, True
+        If Not requiredHeaders.Exists("公募地目" & circ) Then requiredHeaders.Add "公募地目" & circ, True
+        If Not requiredHeaders.Exists("現況地目" & circ) Then requiredHeaders.Add "現況地目" & circ, True
+        If Not requiredHeaders.Exists("公募地積" & circ) Then requiredHeaders.Add "公募地積" & circ, True
+        If Not requiredHeaders.Exists("実測地積" & circ) Then requiredHeaders.Add "実測地積" & circ, True
+        If Not requiredHeaders.Exists("買収金額" & circ) Then requiredHeaders.Add "買収金額" & circ, True
+    Next i
+    
+    ' 4-3 移転補償（①～⑥）
+    For i = 1 To 6
+        circ = GetCircledNumber(i)
+        If Not requiredHeaders.Exists("移転補償種類" & circ) Then requiredHeaders.Add "移転補償種類" & circ, True
+        If Not requiredHeaders.Exists("5,000万控除対象" & circ) Then requiredHeaders.Add "5,000万控除対象" & circ, True
+        If Not requiredHeaders.Exists("内訳額" & circ) Then requiredHeaders.Add "内訳額" & circ, True
+    Next i
+    
+    '--- 必須ヘッダーが全て存在するか確認
+    For Each hdr In requiredHeaders.Keys
+        If Not headerMap.Exists(CStr(hdr)) Then
+            MsgBox "見出し「" & CStr(hdr) & "」がシート「" & BASE_SHEET_NAME & "」に見つかりません。処理を中断します。", vbCritical
+            Exit Sub
+        End If
+    Next hdr
+    
+    '--- よく使う列番号を取得
+    col_PersonName = headerMap("施工業者・債権者")
+    col_Address = headerMap("住所")
+    col_Shuyou = headerMap("収用証明書")
+    col_ContractDate = headerMap("契約年月日")
+    col_ProposalDate = headerMap("起案日")
+    col_Trigger = headerMap("転記")
+    
+    '--- 行数（データ範囲）の特定：転記列を基準
+    lastRow = wsBase.Cells(wsBase.Rows.Count, col_Trigger).End(xlUp).Row
+    If lastRow < DATA_START_ROW Then
+        MsgBox "データが存在しません（" & BASE_SHEET_NAME & "）。", vbInformation
+        Exit Sub
+    End If
+    
+    '--- データ一括読み込み（1行目から最終行まで）
+    dataArr = wsBase.Range(wsBase.Cells(1, 1), wsBase.Cells(lastRow, lastCol)).Value
+    
+    '--- 人キーごとの優先行決定
+    Set personDict = CreateObject("Scripting.Dictionary")
+    personDict.CompareMode = 0 ' BinaryCompare（キーはそのまま）
+    
+    targetRowCount = 0
+    
+    For r = DATA_START_ROW To lastRow
+        
+        ' 収用証明書によるフィルタ
+        val_Shuyou = Trim$(CStr(dataArr(r, col_Shuyou)))
+        If Len(val_Shuyou) > 0 Then
+            ' ダッシュ系記号を含む場合は除外
+            If Not ContainsDashLike(val_Shuyou) Then
+                
+                ' 人キー（施工業者・債権者＋住所）
+                valName = CStr(dataArr(r, col_PersonName))
+                valAddress = CStr(dataArr(r, col_Address))
+                
+                ' 正規化
+                normName = NormalizeText(valName)
+                normAddress = NormalizeText(valAddress)
+                
+                ' 両方空白ならスキップ（任意仕様、正規化後で判定）
+                If Len(normName & normAddress) = 0 Then
+                    GoTo NextRow
+                End If
+                
+                ' 正規化後の値でキー生成
+                key = normName & "||" & normAddress
+                
+                ' 日付値取得（数値化）
+                cd = GetDateNumeric(dataArr(r, col_ContractDate))
+                pd = GetDateNumeric(dataArr(r, col_ProposalDate))
+                
+                If Not personDict.Exists(key) Then
+                    ' 初回登録
+                    personDict.Add key, Array(r, cd, pd)
+                Else
+                    ' 既存との優先度比較
+                    oldInfo = personDict(key)
+                    If IsBetterRow(r, cd, pd, CLng(oldInfo(0)), CDbl(oldInfo(1)), CDbl(oldInfo(2))) Then
+                        personDict(key) = Array(r, cd, pd)
+                    End If
+                End If
+                
+                targetRowCount = targetRowCount + 1
+            End If
+        End If
+        
+NextRow:
+    Next r
+    
+    personCount = personDict.Count
+    
+    '--- 出力シートの用意
+    On Error Resume Next
+    Set wsOut = wb.Worksheets(OUTPUT_SHEET_NAME)
+    On Error GoTo ErrHandler
+    
+    If wsOut Is Nothing Then
+        Set wsOut = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
+        wsOut.Name = OUTPUT_SHEET_NAME
+    Else
+        ' 実行前にクリア（見出し含め全消去）
+        wsOut.Cells.Clear
+    End If
+    
+    '--- 出力ヘッダー順の定義（先頭は人キー）
+    Set outHeaders = New Collection
+    outHeaders.Add "施工業者・債権者"
+    outHeaders.Add "住所"
+    
+    ' 4-1 基本情報
+    outHeaders.Add "大事業"
+    outHeaders.Add "細々節"
+    outHeaders.Add "細々節〔繰越明許分〕"
+    outHeaders.Add "起案日"
+    outHeaders.Add "契約年月日"
+    outHeaders.Add "件名"
+    outHeaders.Add "最終債務負担額（合計）"
+    outHeaders.Add "補助対象額（事業費ベース）"
+    outHeaders.Add "補助額（国費ベース）"
+    outHeaders.Add "単市（合計）"
+    outHeaders.Add "竣工年月日"
+    outHeaders.Add "検査・登記確認年月日"
+    outHeaders.Add "進捗状況"
+    
+    ' 4-2 用地・筆情報（①～⑩）
+    For i = 1 To 10
+        circ = GetCircledNumber(i)
+        outHeaders.Add "移転・補償完了日" & circ
+        outHeaders.Add "大字" & circ
+        outHeaders.Add "字" & circ
+        outHeaders.Add "単価" & circ
+        outHeaders.Add "元地番" & circ
+        outHeaders.Add "後地番" & circ
+        outHeaders.Add "公募地目" & circ
+        outHeaders.Add "現況地目" & circ
+        outHeaders.Add "公募地積" & circ
+        outHeaders.Add "実測地積" & circ
+        outHeaders.Add "買収金額" & circ
+    Next i
+    
+    ' 4-3 移転補償（①～⑥）
+    For i = 1 To 6
+        circ = GetCircledNumber(i)
+        outHeaders.Add "移転補償種類" & circ
+        outHeaders.Add "5,000万控除対象" & circ
+        outHeaders.Add "内訳額" & circ
+    Next i
+    
+    totalCols = outHeaders.Count
+    
+    '--- ヘッダー行の出力（1行目）
+    For i = 1 To totalCols
+        wsOut.Cells(1, i).Value = outHeaders(i)
+    Next i
+    
+    '--- データ配列の準備（2行目以降）
+    If personCount > 0 Then
+        ReDim outArr(1 To personCount, 1 To totalCols)
+        
+        ' キーを配列に退避してソート（施工業者・債権者 → 住所の昇順）
+        ReDim arrKeys(0 To personCount - 1)
+        idx = 0
+        For Each key In personDict.Keys
+            arrKeys(idx) = CStr(key)
+            idx = idx + 1
+        Next key
+        
+        If personCount > 1 Then
+            Call QuickSortStrings(arrKeys, LBound(arrKeys), UBound(arrKeys))
+        End If
+        
+        idx = 0
+        For i = LBound(arrKeys) To UBound(arrKeys)
+            key = arrKeys(i)
+            idx = idx + 1
+            oldInfo = personDict(key)
+            bestRow = CLng(oldInfo(0))
+            
+            ' 先頭2列：正規化済みの人キー（"施工業者・債権者||住所" を分解）
+            parts = Split(key, "||")
+            If UBound(parts) >= 1 Then
+                outArr(idx, 1) = parts(0)
+                outArr(idx, 2) = parts(1)
+            Else
+                outArr(idx, 1) = ""
+                outArr(idx, 2) = ""
+            End If
+            
+            ' 以降：outHeaders に沿って、見出し名で列を引き当てる
+            For j = 3 To totalCols
+                hdr = outHeaders(j)
+                outArr(idx, j) = dataArr(bestRow, headerMap(CStr(hdr)))
+            Next j
+        Next i
+        
+        '--- 出力
+        Set rngOut = wsOut.Range(wsOut.Cells(2, 1), wsOut.Cells(1 + personCount, totalCols))
+        rngOut.Value = outArr
+    End If
+    
+    '--- 見た目整形
+    With wsOut
+        .Range(.Cells(1, 1), .Cells(1, totalCols)).AutoFilter
+        .Columns.AutoFit
+        .Activate
+        .Cells(1, 1).Select
+    End With
+    
+    MsgBox "派生台帳「" & OUTPUT_SHEET_NAME & "」を作成しました。" & vbCrLf & _
+           "対象行数（条件を満たした行）： " & targetRowCount & vbCrLf & _
+           "作成人数（1人＝1行）： " & personCount, vbInformation
+    
+    Exit Sub
+    
+ErrHandler:
+    MsgBox "CreateDerivedLedger_Shuyou 実行中にエラーが発生しました。" & vbCrLf & _
+           "番号: " & Err.Number & vbCrLf & _
+           "内容: " & Err.Description, vbCritical
+End Sub
+
+'================================
+' 補助関数：日付を数値に正規化
+'================================
+Private Function GetDateNumeric(ByVal v As Variant) As Double
+    ' 空欄・変換不能 → 0
+    On Error GoTo EH
+    
+    If IsEmpty(v) Then
+        GetDateNumeric = 0
+    ElseIf IsDate(v) Then
+        GetDateNumeric = CDbl(CDate(v))
+    ElseIf IsNumeric(v) Then
+        GetDateNumeric = CDbl(v)
+    ElseIf IsDate(CStr(v)) Then
+        GetDateNumeric = CDbl(CDate(CStr(v)))
+    Else
+        GetDateNumeric = 0
+    End If
+    Exit Function
+EH:
+    GetDateNumeric = 0
+End Function
+
+'====================================
+' 補助関数：優先行の比較ロジック
+'====================================
+Private Function IsBetterRow( _
+        ByVal newRow As Long, ByVal newCd As Double, ByVal newPd As Double, _
+        ByVal oldRow As Long, ByVal oldCd As Double, ByVal oldPd As Double) As Boolean
+    ' 第一優先：契約年月日が新しい
+    If newCd > oldCd Then
+        IsBetterRow = True
+        Exit Function
+    ElseIf newCd < oldCd Then
+        IsBetterRow = False
+        Exit Function
+    End If
+    
+    ' 第二優先：起案日が新しい
+    If newPd > oldPd Then
+        IsBetterRow = True
+        Exit Function
+    ElseIf newPd < oldPd Then
+        IsBetterRow = False
+        Exit Function
+    End If
+    
+    ' 第三優先：行番号が大きい方（後勝ち）
+    If newRow > oldRow Then
+        IsBetterRow = True
+    Else
+        IsBetterRow = False
+    End If
+End Function
+
+'========================================
+' 補助関数：①～⑩ などの丸数字を返す
+'========================================
+Private Function GetCircledNumber(ByVal n As Long) As String
+    ' 1～10は丸数字で対応（①～⑩）
+    Select Case n
+        Case 1: GetCircledNumber = "①"
+        Case 2: GetCircledNumber = "②"
+        Case 3: GetCircledNumber = "③"
+        Case 4: GetCircledNumber = "④"
+        Case 5: GetCircledNumber = "⑤"
+        Case 6: GetCircledNumber = "⑥"
+        Case 7: GetCircledNumber = "⑦"
+        Case 8: GetCircledNumber = "⑧"
+        Case 9: GetCircledNumber = "⑨"
+        Case 10: GetCircledNumber = "⑩"
+        Case Else
+            GetCircledNumber = CStr(n)
+    End Select
+End Function
+
+'========================================
+' 補助関数：テキスト正規化（Trim＋全角スペース・改行除去）
+'========================================
+Private Function NormalizeText(ByVal s As String) As String
+    Dim result As String
+    result = CStr(s)
+    
+    ' 前後の半角スペースを除去
+    result = Trim$(result)
+    
+    ' 全角スペースを除去
+    If InStr(result, "　") > 0 Then
+        result = Replace$(result, "　", "")
+    End If
+    
+    ' 改行コードを除去（CR / LF / CRLF 想定）
+    If InStr(result, vbCr) > 0 Then
+        result = Replace$(result, vbCr, "")
+    End If
+    If InStr(result, vbLf) > 0 Then
+        result = Replace$(result, vbLf, "")
+    End If
+    
+    NormalizeText = result
+End Function
+
+'========================================
+' 補助関数：ダッシュ系記号を含むか判定
+'   対象: "-", "－", "−", "―", "ー" など
+'========================================
+Private Function ContainsDashLike(ByVal s As String) As Boolean
+    Dim ch As Variant
+    Dim targets As Variant
+    
+    targets = Array("-", "－", "−", "―", "ー")
+    
+    For Each ch In targets
+        If InStr(s, CStr(ch)) > 0 Then
+            ContainsDashLike = True
+            Exit Function
+        End If
+    Next ch
+    
+    ContainsDashLike = False
+End Function
+
+'========================================
+' 補助関数：文字列配列のクイックソート（昇順）
+'   ※キー "施工業者・債権者||住所" をそのまま比較
+'========================================
+Private Sub QuickSortStrings(ByRef arr() As String, ByVal first As Long, ByVal last As Long)
+    Dim i As Long, j As Long
+    Dim pivot As String
+    Dim tmp As String
+    
+    i = first
+    j = last
+    pivot = arr((first + last) \ 2)
+    
+    Do While i <= j
+        Do While arr(i) < pivot
+            i = i + 1
+        Loop
+        Do While arr(j) > pivot
+            j = j - 1
+        Loop
+        
+        If i <= j Then
+            tmp = arr(i)
+            arr(i) = arr(j)
+            arr[j] = tmp
+            i = i + 1
+            j = j - 1
+        End If
+    Loop
+    
+    If first < j Then Call QuickSortStrings(arr, first, j)
+    If i < last Then Call QuickSortStrings(arr, i, last)
+End Sub
+
