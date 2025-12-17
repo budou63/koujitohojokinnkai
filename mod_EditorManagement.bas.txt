@@ -1,0 +1,263 @@
+Option Explicit
+
+' 台帳編集者シートの管理と「最終編集者」列の更新をまとめたモジュール
+' Worksheet_Change から呼び出し、既存ロジックを汚さず最小限の責務で動作させる
+
+Private Const LEDGER_SHEET_NAME As String = "台帳編集者"
+Private Const HEADER_LAST_EDITOR As String = "最終編集者"
+Private Const HEADER_ROW_DEFAULT As Long = 3
+
+Public Sub HandleEditorOnChange(ByVal ws表 As Worksheet, ByVal Target As Range, _
+                                ByVal colMap As Object, ByVal editorId As String, _
+                                Optional ByVal headerRow As Long = HEADER_ROW_DEFAULT)
+    On Error GoTo CleanExit
+
+    If editorId = "" Then GoTo CleanExit
+
+    Dim wsLedger As Worksheet
+    Set wsLedger = GetLedgerSheet()
+    If wsLedger Is Nothing Then GoTo CleanExit
+
+    ' ① ID を台帳に登録（重複は追加しない）
+    RegisterEditorIfMissing wsLedger, editorId
+
+    ' ② 「最終編集者」列の特定（見出し名ベース）
+    Dim editorCol As Long
+    editorCol = GetLastEditorColumn(ws表, colMap, headerRow)
+    If editorCol = 0 Then GoTo CleanExit
+
+    ' ③ 入力系列列の編集が含まれる行だけを対象にする
+    Dim dataRange As Range
+    Set dataRange = Intersect(Target, ws表.Rows(headerRow + 1 & ":" & ws表.Rows.Count))
+    If dataRange Is Nothing Then GoTo CleanExit
+
+    Dim inputCols As Object
+    Set inputCols = BuildInputColumns(ws表, colMap, headerRow)
+
+    Dim inputEdited As Range
+    Set inputEdited = GetEditedInputRange(ws表, dataRange, inputCols)
+    If inputEdited Is Nothing Then GoTo CleanExit
+
+    Dim affectedRows As Range
+    Set affectedRows = inputEdited.EntireRow
+
+    ' ④ 表シートの対象行に表示名を書き込む
+    Dim dispName As String
+    dispName = GetEditorDisplayName(wsLedger, editorId)
+    UpdateLastEditorForRows ws表, affectedRows, editorCol, dispName  ' ★FIX: 引数不足を補完
+
+    ' ⑤ 対象行に残っている ID 表記のみを、対応する名前に置き換える
+    ConvertExistingEditorIds ws表, wsLedger, editorCol, affectedRows
+
+CleanExit:
+    On Error Resume Next
+End Sub
+
+' --- 内部処理 ---
+
+Private Function GetLedgerSheet() As Worksheet
+    On Error Resume Next
+    Set GetLedgerSheet = ThisWorkbook.Sheets(LEDGER_SHEET_NAME)
+    On Error GoTo 0
+End Function
+
+Private Sub RegisterEditorIfMissing(ByVal wsLedger As Worksheet, ByVal editorId As String)
+    If editorId = "" Then Exit Sub
+
+    Dim found As Range
+    Set found = wsLedger.Columns(1).Find(What:=editorId, LookIn:=xlValues, LookAt:=xlWhole)
+    If Not found Is Nothing Then Exit Sub
+
+    Dim lastRow As Long, writeRow As Long
+    lastRow = wsLedger.Cells(wsLedger.Rows.Count, 1).End(xlUp).Row
+    If lastRow < 2 Then
+        writeRow = 2
+    Else
+        writeRow = lastRow + 1
+    End If
+
+    wsLedger.Cells(writeRow, 1).Value = editorId
+End Sub
+
+Private Function GetEditorDisplayName(ByVal wsLedger As Worksheet, ByVal editorId As String) As String
+    Dim found As Range
+    Set found = wsLedger.Columns(1).Find(What:=editorId, LookIn:=xlValues, LookAt:=xlWhole)
+    If Not found Is Nothing Then
+        Dim aliasName As String
+        aliasName = Trim(CStr(found.Offset(0, 1).Value))
+        If aliasName <> "" Then
+            GetEditorDisplayName = aliasName
+            Exit Function
+        End If
+    End If
+    GetEditorDisplayName = editorId
+End Function
+
+Private Function GetLastEditorColumn(ByVal ws表 As Worksheet, ByVal colMap As Object, _
+    ByVal headerRow As Long) As Long
+
+    ' colMap で完全一致を優先
+    If Not colMap Is Nothing Then
+        If colMap.Exists(HEADER_LAST_EDITOR) Then
+            GetLastEditorColumn = colMap(HEADER_LAST_EDITOR)
+            Exit Function
+        End If
+
+        Dim key As Variant
+        For Each key In colMap.Keys
+            If NormalizeHeaderText(CStr(key)) = NormalizeHeaderText(HEADER_LAST_EDITOR) Then
+                GetLastEditorColumn = colMap(key)
+                Exit Function
+            End If
+        Next key
+    End If
+
+    ' 念のため見出し行を直接走査
+    Dim lastCol As Long, c As Long
+    lastCol = ws表.Cells(headerRow, ws表.Columns.Count).End(xlToLeft).Column
+    For c = 1 To lastCol
+        If NormalizeHeaderText(CStr(ws表.Cells(headerRow, c).Value)) = NormalizeHeaderText(HEADER_LAST_EDITOR) Then
+            GetLastEditorColumn = c
+            Exit Function
+        End If
+    Next c
+End Function
+
+Private Sub UpdateLastEditorForRows(ByVal ws表 As Worksheet, ByVal affectedRows As Range, _
+    ByVal editorCol As Long, ByVal dispName As String)
+
+    If affectedRows Is Nothing Then Exit Sub
+
+    Dim seen As Object, r As Range
+    Set seen = CreateObject("Scripting.Dictionary")
+
+    For Each r In affectedRows.Rows
+        If Not seen.Exists(r.Row) Then
+            ws表.Cells(r.Row, editorCol).Value = dispName
+            seen.Add r.Row, True
+        End If
+    Next r
+End Sub
+
+Private Sub ConvertExistingEditorIds(ByVal ws表 As Worksheet, ByVal wsLedger As Worksheet, _
+    ByVal editorCol As Long, ByVal affectedRows As Range)
+
+    If affectedRows Is Nothing Then Exit Sub
+
+    Dim r As Range
+    Dim idVal As String, dispName As String
+
+    For Each r In affectedRows.Rows
+        idVal = Trim(CStr(ws表.Cells(r.Row, editorCol).Value))
+        If idVal <> "" Then
+            dispName = GetEditorDisplayName(wsLedger, idVal)
+            If dispName <> "" And dispName <> idVal Then
+                ws表.Cells(r.Row, editorCol).Value = dispName
+            End If
+        End If
+    Next r
+End Sub
+
+Private Function NormalizeHeaderText(ByVal s As String) As String
+    s = Replace(s, vbCr, "")
+    s = Replace(s, vbLf, "")
+    s = Replace(s, "　", " ")
+    s = Application.Trim(s)
+    NormalizeHeaderText = s
+End Function
+
+' === 入力系列列の特定 ===
+
+Private Function BuildInputColumns(ByVal ws表 As Worksheet, ByVal colMap As Object, _
+    ByVal headerRow As Long) As Object
+
+    Dim dict As Object
+    Set dict = CreateObject("Scripting.Dictionary")
+
+    If Not colMap Is Nothing Then
+        Dim key As Variant, colIndex As Long
+        For Each key In colMap.Keys
+            colIndex = colMap(key)
+            If IsInputHeader(NormalizeHeaderText(CStr(key))) Then
+                If Not dict.Exists(colIndex) Then dict.Add colIndex, True
+            End If
+        Next key
+    End If
+
+    Set BuildInputColumns = dict
+End Function
+
+Private Function IsInputHeader(ByVal normHeader As String) As Boolean
+
+    ' 単純な完全一致
+    Select Case normHeader
+        Case "件名", "施工業者・債権者", "業者名", "施工業者", "債権者", _
+             "起案日", "起案日付", _
+             "口座名義", "口座名義2"
+            IsInputHeader = True
+            Exit Function
+    End Select
+
+    ' パターンマッチ系（末尾の枝番やa/b/cなどを許容）
+    If StartsWith(normHeader, "変更内容") Then
+        IsInputHeader = True: Exit Function
+    End If
+    If StartsWith(normHeader, "債務負担額") Then
+        IsInputHeader = True: Exit Function
+    End If
+    If StartsWith(normHeader, "設計金額") Then
+        IsInputHeader = True: Exit Function
+    End If
+    If StartsWith(normHeader, "補助対象額") Then
+        IsInputHeader = True: Exit Function
+    End If
+    If StartsWith(normHeader, "国費率") Then
+        IsInputHeader = True: Exit Function
+    End If
+    If StartsWith(normHeader, "補助額") Then
+        IsInputHeader = True: Exit Function
+    End If
+    If StartsWith(normHeader, "単市") Then
+        IsInputHeader = True: Exit Function
+    End If
+    If StartsWith(normHeader, "工事内容") Then
+        IsInputHeader = True: Exit Function
+    End If
+
+    IsInputHeader = False ' ★FIX: 明示的に False を返す
+End Function
+
+Private Function StartsWith(ByVal text As String, ByVal prefix As String) As Boolean
+    If Len(text) < Len(prefix) Then
+        StartsWith = False
+    Else
+        StartsWith = (Left$(text, Len(prefix)) = prefix)
+    End If
+End Function
+
+Private Function GetEditedInputRange(ByVal ws表 As Worksheet, ByVal dataRange As Range, _
+    ByVal inputCols As Object) As Range
+
+    If dataRange Is Nothing Then Exit Function
+    If inputCols Is Nothing Then Exit Function
+    If inputCols.Count = 0 Then Exit Function
+
+    Dim result As Range
+    Dim colIndex As Variant
+    Dim colRange As Range, tmp As Range
+
+    For Each colIndex In inputCols.Keys
+        Set colRange = ws表.Columns(CLng(colIndex))
+        Set tmp = Intersect(dataRange, colRange)
+        If Not tmp Is Nothing Then
+            If result Is Nothing Then
+                Set result = tmp
+            Else
+                Set result = Union(result, tmp)
+            End If
+        End If
+    Next colIndex
+
+    Set GetEditedInputRange = result
+End Function
+

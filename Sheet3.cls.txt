@@ -13,8 +13,11 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Dim row As Long, val As String
     Dim srcCol As Long, condCol As Long, destCol As Long
     Dim colMap As Object
+    Dim currentUserId As String
+    Dim eventsBefore As Boolean  ' ★FIX: EnableEvents 復元用退避
     Set colMap = CreateObject("Scripting.Dictionary")
 
+    eventsBefore = Application.EnableEvents ' ★FIX: 復元用に現在値を保持
     On Error GoTo ErrorHandler
     
     ' === 修正ポイント①：1行目（通し番号行）の変更時は処理をスキップ ===
@@ -22,9 +25,11 @@ Private Sub Worksheet_Change(ByVal Target As Range)
         GoTo CleanExit
     End If
     
-    ' ★ 行まるごとの操作（挿入・削除など）は何もしない
-    If Target.Address = Target.EntireRow.Address Then Exit Sub
-
+    ' ★ データ行（4行目以降）に交差しない変更は何もしない
+    If Intersect(Target, Me.Rows("4:" & Me.Rows.Count)) Is Nothing Then
+        GoTo CleanExit
+    End If
+    
     Application.EnableEvents = False
 
     ' ▼ どの編集でもまずログ＆黄色塗り（表シートかどうかは中で判定）
@@ -35,7 +40,11 @@ Private Sub Worksheet_Change(ByVal Target As Range)
 
     ' === 見出し名と列番号を記録 ===
     For i = 1 To Me.Cells(3, Columns.Count).End(xlToLeft).Column
-        colMap(Me.Cells(3, i).value) = i
+        Dim hdr As String
+        hdr = CStr(Me.Cells(3, i).value)
+        If Trim$(hdr) <> "" Then ' ★FIX: 空見出しは登録しない
+            colMap(hdr) = i
+        End If
         Select Case Me.Cells(3, i).value
             Case "件名": 件名列 = i
             Case "採番": 採番列 = i
@@ -45,6 +54,11 @@ Private Sub Worksheet_Change(ByVal Target As Range)
 
         ' === 業者名入力時：代表者・住所を自動入力（見出し名ベースでズレない） ===
     Dim headerRow As Long: headerRow = 3
+
+    ' === 台帳編集者シートへの登録と「最終編集者」列の表示名反映（既存ロジックは変更しない） ===
+    currentUserId = Environ("USERNAME")
+    Call HandleEditorOnChange(Me, Target, colMap, currentUserId, headerRow)
+
     Dim col業者 As Long, col起案日 As Long, col代表者 As Long, col住所 As Long
 
     ' ★あなたの見出しに合わせた候補（必要に応じて追加OK）
@@ -296,7 +310,7 @@ End If
     Call HandleAccountNormalize(Me, Target)
 
 CleanExit:
-    Application.EnableEvents = True
+    Application.EnableEvents = eventsBefore ' ★FIX: 退避した元の状態に復元
     Exit Sub
 
 
