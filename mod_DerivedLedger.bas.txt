@@ -31,6 +31,7 @@ Public Sub CreateDerivedLedger_Shuyou()
     
     Dim r As Long
     Dim key As String
+    Dim vKey As Variant
     Dim val_Shuyou As String
     Dim valName As String
     Dim valAddress As String
@@ -281,10 +282,10 @@ NextRow:
         ' キーを配列に退避してソート（施工業者・債権者 → 住所の昇順）
         ReDim arrKeys(0 To personCount - 1)
         idx = 0
-        For Each key In personDict.Keys
-            arrKeys(idx) = CStr(key)
+        For Each vKey In personDict.Keys
+            arrKeys(idx) = CStr(vKey)
             idx = idx + 1
-        Next key
+        Next vKey
         
         If personCount > 1 Then
             Call QuickSortStrings(arrKeys, LBound(arrKeys), UBound(arrKeys))
