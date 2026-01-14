@@ -371,9 +371,11 @@ End Function
 Public Sub 差込文書生成()
     Dim ws表 As Worksheet, ws差込 As Worksheet
     Dim col差込出力 As Long, col住所 As Long, col業者 As Long, col代表者 As Long
+    Dim col送付先住所 As Long, col送付先氏名 As Long
     Dim lastRow As Long, r As Long, outRow As Long
     Dim val差込出力 As String, val住所 As String, val業者 As String, val代表者 As String
-    Dim 宛名 As String, 住所 As String
+    Dim val送付先住所 As String, val送付先氏名 As String
+    Dim 宛名 As String, 住所 As String, 敬称 As String
     Dim dict重複 As Object: Set dict重複 = CreateObject("Scripting.Dictionary")
     Dim key重複 As String
     Dim cnt出力 As Long, cnt重複 As Long, cnt空欄 As Long
@@ -391,29 +393,11 @@ Public Sub 差込文書生成()
     End If
     On Error GoTo 0
     
-    ' 見出し行の安全化チェック（3行目）
-    Dim hdrA As String, hdrB As String
-    hdrA = Trim$(CStr(ws差込.Cells(3, 1).value))
-    hdrB = Trim$(CStr(ws差込.Cells(3, 2).value))
-    If Len(hdrA) = 0 And Len(hdrB) = 0 Then
-        ' 両方空なら設定
-        ws差込.Cells(3, 1).value = "宛名"
-        ws差込.Cells(3, 2).value = "住所"
-    ElseIf hdrA = "宛名" And hdrB = "住所" Then
-        ' 既に正しい見出しなら何もしない
-    Else
-        ' それ以外は警告して終了
-        MsgBox "差込文書シートの見出し（3行目）が想定外です。" & vbCrLf & _
-               "A3=" & hdrA & ", B3=" & hdrB & vbCrLf & _
-               "A3='宛名', B3='住所' に設定するか、空欄にしてください。", vbExclamation
-        Exit Sub
-    End If
-    
-    ' 4行目以降をClearContents（書式・列幅・入力規則は保持）
+    ' 2行目以降をClearContents（書式・列幅・入力規則は保持、1行目は触らない）
     Dim lastOutRow As Long
     lastOutRow = ws差込.Cells(ws差込.Rows.Count, 1).End(xlUp).row
-    If lastOutRow >= WM_DATA_START Then
-        ws差込.Range(ws差込.Cells(WM_DATA_START, 1), ws差込.Cells(lastOutRow, 2)).ClearContents
+    If lastOutRow >= 2 Then
+        ws差込.Range(ws差込.Cells(2, 1), ws差込.Cells(lastOutRow, 3)).ClearContents
     End If
     
     ' 列番号の取得
@@ -421,6 +405,8 @@ Public Sub 差込文書生成()
     col住所 = WM_GetColByHeader(ws表, "住所")
     col業者 = WM_GetColByHeader(ws表, "施工業者・債権者")
     col代表者 = WM_GetColByHeader(ws表, "代表者")
+    col送付先住所 = WM_GetColByHeader(ws表, "送付先住所")
+    col送付先氏名 = WM_GetColByHeader(ws表, "送付先氏名")
     
     ' 必須列の存在チェック
     If col差込出力 = 0 Then
@@ -442,14 +428,25 @@ Public Sub 差込文書生成()
     
     ' 最終行の取得（フィルタに影響されない実装）
     Dim lastRow差込出力 As Long, lastRow住所 As Long, lastRow業者 As Long, lastRow代表者 As Long
+    Dim lastRow送付先住所 As Long, lastRow送付先氏名 As Long
     lastRow差込出力 = ws表.Cells(ws表.Rows.Count, col差込出力).End(xlUp).row
     lastRow住所 = ws表.Cells(ws表.Rows.Count, col住所).End(xlUp).row
     lastRow業者 = ws表.Cells(ws表.Rows.Count, col業者).End(xlUp).row
     lastRow代表者 = ws表.Cells(ws表.Rows.Count, col代表者).End(xlUp).row
-    lastRow = Application.WorksheetFunction.Max(lastRow差込出力, lastRow住所, lastRow業者, lastRow代表者)
+    If col送付先住所 > 0 Then
+        lastRow送付先住所 = ws表.Cells(ws表.Rows.Count, col送付先住所).End(xlUp).row
+    Else
+        lastRow送付先住所 = 0
+    End If
+    If col送付先氏名 > 0 Then
+        lastRow送付先氏名 = ws表.Cells(ws表.Rows.Count, col送付先氏名).End(xlUp).row
+    Else
+        lastRow送付先氏名 = 0
+    End If
+    lastRow = Application.WorksheetFunction.Max(lastRow差込出力, lastRow住所, lastRow業者, lastRow代表者, lastRow送付先住所, lastRow送付先氏名)
     
     ' データ処理
-    outRow = WM_DATA_START
+    outRow = 2
     cnt出力 = 0
     cnt重複 = 0
     cnt空欄 = 0
@@ -457,16 +454,41 @@ Public Sub 差込文書生成()
     For r = WM_DATA_START To lastRow
         val差込出力 = Trim$(CStr(ws表.Cells(r, col差込出力).value))
         
-        ' 差込文書出力フラグが✓の行のみ対象
-        If val差込出力 = "✓" Then
+        ' 差込文書出力フラグが何か入力されていたら対象
+        If Len(val差込出力) > 0 Then
             val住所 = Trim$(CStr(ws表.Cells(r, col住所).value))
             val業者 = Trim$(CStr(ws表.Cells(r, col業者).value))
             val代表者 = Trim$(CStr(ws表.Cells(r, col代表者).value))
+            If col送付先住所 > 0 Then
+                val送付先住所 = Trim$(CStr(ws表.Cells(r, col送付先住所).value))
+            Else
+                val送付先住所 = ""
+            End If
+            If col送付先氏名 > 0 Then
+                val送付先氏名 = Trim$(CStr(ws表.Cells(r, col送付先氏名).value))
+            Else
+                val送付先氏名 = ""
+            End If
             
-            ' 宛名の生成（前後空白・改行をTrim）
-            宛名 = TrimRemoveNewlines(val業者)
+            ' 住所の優先ルール：送付先住所が空でなければ送付先住所、空なら住所
+            If Len(val送付先住所) > 0 Then
+                住所 = TrimRemoveNewlines(val送付先住所)
+            Else
+                住所 = TrimRemoveNewlines(val住所)
+            End If
             
-            ' 敬称付与処理
+            ' 宛名の優先ルール：送付先氏名が空でなければ送付先氏名、空なら施工業者・債権者
+            Dim 宛名ベース As String
+            If Len(val送付先氏名) > 0 Then
+                宛名ベース = TrimRemoveNewlines(val送付先氏名)
+            Else
+                宛名ベース = TrimRemoveNewlines(val業者)
+            End If
+            
+            ' 敬称の判定（宛名に既に付いているかチェック）
+            宛名 = 宛名ベース
+            敬称 = ""
+            
             If Len(宛名) > 0 Then
                 Dim 末尾 As String
                 If Len(宛名) >= 2 Then
@@ -475,34 +497,34 @@ Public Sub 差込文書生成()
                     末尾 = ""
                 End If
                 
-                If Len(Trim$(val代表者)) > 0 Then
-                    ' 業者と判定：末尾が「御中」でなければ付与
-                    If 末尾 <> "御中" Then
-                        宛名 = 宛名 & "御中"
-                    End If
-                Else
-                    ' 人物と判定：末尾が「様」でも「御中」でもなければ「様」を付与
-                    If 末尾 <> "様" And 末尾 <> "御中" Then
-                        宛名 = 宛名 & "様"
+                ' 既に敬称が付いているかチェック
+                Dim 既に敬称付き As Boolean
+                既に敬称付き = (末尾 = "様" Or 末尾 = "御中")
+                
+                If Not 既に敬称付き Then
+                    ' 代表者が空でない→業者とみなし「御中」
+                    ' 代表者が空→人物とみなし「様」
+                    If Len(Trim$(val代表者)) > 0 Then
+                        敬称 = "御中"
+                    Else
+                        敬称 = "様"
                     End If
                 End If
             End If
             
-            ' 住所の生成（前後空白・改行をTrim）
-            住所 = TrimRemoveNewlines(val住所)
-            
-            ' 空欄チェック（A案：除外）
-            If Len(宛名) = 0 Or Len(住所) = 0 Then
+            ' 空欄チェック（A列住所またはB列宛名が空欄なら除外）
+            If Len(住所) = 0 Or Len(宛名) = 0 Then
                 cnt空欄 = cnt空欄 + 1
             Else
-                ' 重複チェック用キー（前後空白・改行をTrimした文字列）
-                key重複 = 宛名 & "||" & 住所
+                ' 重複チェック用キー（住所+宛名+敬称の完全一致）
+                key重複 = 住所 & "||" & 宛名 & "||" & 敬称
                 
                 ' 重複排除
                 If Not dict重複.Exists(key重複) Then
                     dict重複(key重複) = True
-                    ws差込.Cells(outRow, 1).value = 宛名
-                    ws差込.Cells(outRow, 2).value = 住所
+                    ws差込.Cells(outRow, 1).value = 住所
+                    ws差込.Cells(outRow, 2).value = 宛名
+                    ws差込.Cells(outRow, 3).value = 敬称
                     outRow = outRow + 1
                     cnt出力 = cnt出力 + 1
                 Else
