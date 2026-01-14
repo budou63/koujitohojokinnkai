@@ -354,4 +354,214 @@ Public Sub WM_CheckTemplateAgainstHeaders(ByVal templatePath As String, ByVal ws
     End If
 End Sub
 
+' --- 前3行 ---
+' 改行文字を除去してTrimする（ヘルパー関数）
+Private Function TrimRemoveNewlines(ByVal s As String) As String
+    Dim result As String
+    result = Replace$(s, vbCrLf, "")
+    result = Replace$(result, vbCr, "")
+    result = Replace$(result, vbLf, "")
+    TrimRemoveNewlines = Trim$(result)
+End Function
+' --- 後3行 ---
+
+' --- 前3行 ---
+' 差込文書生成マクロ：表シートの差込文書出力フラグが立っている行を対象に、
+' Word差し込み用のデータを「差込文書」シートへ生成する
+Public Sub 差込文書生成()
+    Dim ws表 As Worksheet, ws差込 As Worksheet
+    Dim col差込出力 As Long, col住所 As Long, col業者 As Long, col代表者 As Long
+    Dim lastRow As Long, r As Long, outRow As Long
+    Dim val差込出力 As String, val住所 As String, val業者 As String, val代表者 As String
+    Dim 宛名 As String, 住所 As String
+    Dim dict重複 As Object: Set dict重複 = CreateObject("Scripting.Dictionary")
+    Dim key重複 As String
+    Dim cnt出力 As Long, cnt重複 As Long, cnt空欄 As Long
+    
+    On Error GoTo EH
+    
+    Set ws表 = ThisWorkbook.Sheets("表")
+    
+    ' 出力先シートの準備
+    On Error Resume Next
+    Set ws差込 = ThisWorkbook.Sheets("差込文書")
+    If ws差込 Is Nothing Then
+        Set ws差込 = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+        ws差込.name = "差込文書"
+    End If
+    On Error GoTo 0
+    
+    ' 見出し行の安全化チェック（3行目）
+    Dim hdrA As String, hdrB As String
+    hdrA = Trim$(CStr(ws差込.Cells(3, 1).value))
+    hdrB = Trim$(CStr(ws差込.Cells(3, 2).value))
+    If Len(hdrA) = 0 And Len(hdrB) = 0 Then
+        ' 両方空なら設定
+        ws差込.Cells(3, 1).value = "宛名"
+        ws差込.Cells(3, 2).value = "住所"
+    ElseIf hdrA = "宛名" And hdrB = "住所" Then
+        ' 既に正しい見出しなら何もしない
+    Else
+        ' それ以外は警告して終了
+        MsgBox "差込文書シートの見出し（3行目）が想定外です。" & vbCrLf & _
+               "A3=" & hdrA & ", B3=" & hdrB & vbCrLf & _
+               "A3='宛名', B3='住所' に設定するか、空欄にしてください。", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 4行目以降をClearContents（書式・列幅・入力規則は保持）
+    Dim lastOutRow As Long
+    lastOutRow = ws差込.Cells(ws差込.Rows.Count, 1).End(xlUp).row
+    If lastOutRow >= WM_DATA_START Then
+        ws差込.Range(ws差込.Cells(WM_DATA_START, 1), ws差込.Cells(lastOutRow, 2)).ClearContents
+    End If
+    
+    ' 列番号の取得
+    col差込出力 = WM_GetColByHeader(ws表, "差込文書出力")
+    col住所 = WM_GetColByHeader(ws表, "住所")
+    col業者 = WM_GetColByHeader(ws表, "施工業者・債権者")
+    col代表者 = WM_GetColByHeader(ws表, "代表者")
+    
+    ' 必須列の存在チェック
+    If col差込出力 = 0 Then
+        MsgBox "見出し「差込文書出力」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
+    If col住所 = 0 Then
+        MsgBox "見出し「住所」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
+    If col業者 = 0 Then
+        MsgBox "見出し「施工業者・債権者」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
+    If col代表者 = 0 Then
+        MsgBox "見出し「代表者」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 最終行の取得（フィルタに影響されない実装）
+    Dim lastRow差込出力 As Long, lastRow住所 As Long, lastRow業者 As Long, lastRow代表者 As Long
+    lastRow差込出力 = ws表.Cells(ws表.Rows.Count, col差込出力).End(xlUp).row
+    lastRow住所 = ws表.Cells(ws表.Rows.Count, col住所).End(xlUp).row
+    lastRow業者 = ws表.Cells(ws表.Rows.Count, col業者).End(xlUp).row
+    lastRow代表者 = ws表.Cells(ws表.Rows.Count, col代表者).End(xlUp).row
+    lastRow = Application.WorksheetFunction.Max(lastRow差込出力, lastRow住所, lastRow業者, lastRow代表者)
+    
+    ' データ処理
+    outRow = WM_DATA_START
+    cnt出力 = 0
+    cnt重複 = 0
+    cnt空欄 = 0
+    
+    For r = WM_DATA_START To lastRow
+        val差込出力 = Trim$(CStr(ws表.Cells(r, col差込出力).value))
+        
+        ' 差込文書出力フラグが✓の行のみ対象
+        If val差込出力 = "✓" Then
+            val住所 = Trim$(CStr(ws表.Cells(r, col住所).value))
+            val業者 = Trim$(CStr(ws表.Cells(r, col業者).value))
+            val代表者 = Trim$(CStr(ws表.Cells(r, col代表者).value))
+            
+            ' 宛名の生成（前後空白・改行をTrim）
+            宛名 = TrimRemoveNewlines(val業者)
+            
+            ' 敬称付与処理
+            If Len(宛名) > 0 Then
+                Dim 末尾 As String
+                If Len(宛名) >= 2 Then
+                    末尾 = Right$(宛名, 2)
+                Else
+                    末尾 = ""
+                End If
+                
+                If Len(Trim$(val代表者)) > 0 Then
+                    ' 業者と判定：末尾が「御中」でなければ付与
+                    If 末尾 <> "御中" Then
+                        宛名 = 宛名 & "御中"
+                    End If
+                Else
+                    ' 人物と判定：末尾が「様」でも「御中」でもなければ「様」を付与
+                    If 末尾 <> "様" And 末尾 <> "御中" Then
+                        宛名 = 宛名 & "様"
+                    End If
+                End If
+            End If
+            
+            ' 住所の生成（前後空白・改行をTrim）
+            住所 = TrimRemoveNewlines(val住所)
+            
+            ' 空欄チェック（A案：除外）
+            If Len(宛名) = 0 Or Len(住所) = 0 Then
+                cnt空欄 = cnt空欄 + 1
+            Else
+                ' 重複チェック用キー（前後空白・改行をTrimした文字列）
+                key重複 = 宛名 & "||" & 住所
+                
+                ' 重複排除
+                If Not dict重複.Exists(key重複) Then
+                    dict重複(key重複) = True
+                    ws差込.Cells(outRow, 1).value = 宛名
+                    ws差込.Cells(outRow, 2).value = 住所
+                    outRow = outRow + 1
+                    cnt出力 = cnt出力 + 1
+                Else
+                    cnt重複 = cnt重複 + 1
+                End If
+            End If
+        End If
+    Next r
+    
+    ' 処理結果をMsgBox表示
+    MsgBox "差込文書出力件数：" & cnt出力 & "件" & vbCrLf & _
+           "重複スキップ件数：" & cnt重複 & "件" & vbCrLf & _
+           "空欄除外件数：" & cnt空欄 & "件", vbInformation
+    
+    Exit Sub
+    
+EH:
+    MsgBox "エラーが発生しました：" & Err.Description, vbCritical
+End Sub
+' --- 後3行 ---
+
+' --- 前3行 ---
+' 差込文書出力フラグ全解除マクロ：表シートの差込文書出力フラグを一括で解除する
+Public Sub 差込文書出力フラグ全解除()
+    Dim ws表 As Worksheet
+    Dim col差込出力 As Long
+    Dim lastRow As Long
+    Dim ret As VbMsgBoxResult
+    
+    On Error GoTo EH
+    
+    ' 確認メッセージ
+    ret = MsgBox("差込文書出力フラグをすべて解除しますか？", vbYesNo + vbQuestion, "確認")
+    If ret <> vbYes Then Exit Sub
+    
+    Set ws表 = ThisWorkbook.Sheets("表")
+    
+    ' 列番号の取得
+    col差込出力 = WM_GetColByHeader(ws表, "差込文書出力")
+    
+    If col差込出力 = 0 Then
+        MsgBox "見出し「差込文書出力」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 最終行の取得（フィルタに影響されない実装）
+    lastRow = ws表.Cells(ws表.Rows.Count, col差込出力).End(xlUp).row
+    
+    ' 4行目以降をClearContents（書式・入力規則・列構造は保持）
+    If lastRow >= WM_DATA_START Then
+        ws表.Range(ws表.Cells(WM_DATA_START, col差込出力), ws表.Cells(lastRow, col差込出力)).ClearContents
+    End If
+    
+    MsgBox "差込文書出力フラグをすべて解除しました。", vbInformation
+    
+    Exit Sub
+    
+EH:
+    MsgBox "エラーが発生しました：" & Err.Description, vbCritical
+End Sub
+' --- 後3行 ---
 
