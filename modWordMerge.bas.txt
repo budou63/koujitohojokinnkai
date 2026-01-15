@@ -366,16 +366,69 @@ End Function
 ' --- 後3行 ---
 
 ' --- 前3行 ---
+' 空白同義（記号やスペースのみ）を除いた有効値か判定
+Private Function IsMeaningfulValue(ByVal s As String) As Boolean
+    Dim cleaned As String
+    cleaned = TrimRemoveNewlines(s)
+    cleaned = Replace$(cleaned, " ", "")
+    cleaned = Replace$(cleaned, "　", "")
+    cleaned = Replace$(cleaned, "-", "")
+    cleaned = Replace$(cleaned, "－", "")
+    cleaned = Replace$(cleaned, "ー", "")
+    IsMeaningfulValue = (Len(cleaned) > 0)
+End Function
+' --- 後3行 ---
+
+' --- 前3行 ---
+' 郵便番号の正規化（〒 + 123-4567 形式を優先）
+Private Function NormalizePostalCode(ByVal s As String) As String
+    Dim cleaned As String
+    Dim digits As String
+    Dim i As Long
+    Dim ch As String
+
+    If Not IsMeaningfulValue(s) Then
+        NormalizePostalCode = ""
+        Exit Function
+    End If
+
+    cleaned = TrimRemoveNewlines(s)
+    cleaned = Replace$(cleaned, "〒", "")
+    cleaned = Replace$(cleaned, " ", "")
+    cleaned = Replace$(cleaned, "　", "")
+    cleaned = Replace$(cleaned, "-", "")
+    cleaned = Replace$(cleaned, "－", "")
+    cleaned = Replace$(cleaned, "ー", "")
+
+    digits = ""
+    For i = 1 To Len(cleaned)
+        ch = Mid$(cleaned, i, 1)
+        If ch >= "0" And ch <= "9" Then
+            digits = digits & ch
+        End If
+    Next i
+
+    If Len(digits) = 7 Then
+        NormalizePostalCode = "〒" & Left$(digits, 3) & "-" & Mid$(digits, 4, 4)
+    Else
+        NormalizePostalCode = ""
+    End If
+End Function
+' --- 後3行 ---
+
+' --- 前3行 ---
 ' 差込文書生成マクロ：表シートの差込文書出力フラグが立っている行を対象に、
 ' Word差し込み用のデータを「差込文書」シートへ生成する
 Public Sub 差込文書生成()
     Dim ws表 As Worksheet, ws差込 As Worksheet
     Dim col差込出力 As Long, col住所 As Long, col業者 As Long, col代表者 As Long
     Dim col送付先住所 As Long, col送付先氏名 As Long
+    Dim col送付先郵便番号 As Long, col郵便番号 As Long
     Dim lastRow As Long, r As Long, outRow As Long
     Dim val差込出力 As String, val住所 As String, val業者 As String, val代表者 As String
     Dim val送付先住所 As String, val送付先氏名 As String
-    Dim 宛名 As String, 住所 As String, 敬称 As String
+    Dim val送付先郵便番号 As String, val郵便番号 As String
+    Dim 宛名 As String, 住所 As String, 敬称 As String, 郵便番号 As String
     Dim dict重複 As Object: Set dict重複 = CreateObject("Scripting.Dictionary")
     Dim key重複 As String
     Dim cnt出力 As Long, cnt重複 As Long, cnt空欄 As Long
@@ -397,7 +450,7 @@ Public Sub 差込文書生成()
     Dim lastOutRow As Long
     lastOutRow = ws差込.Cells(ws差込.Rows.Count, 1).End(xlUp).row
     If lastOutRow >= 2 Then
-        ws差込.Range(ws差込.Cells(2, 1), ws差込.Cells(lastOutRow, 3)).ClearContents
+        ws差込.Range(ws差込.Cells(2, 1), ws差込.Cells(lastOutRow, 4)).ClearContents
     End If
     
     ' 列番号の取得
@@ -407,6 +460,8 @@ Public Sub 差込文書生成()
     col代表者 = WM_GetColByHeader(ws表, "代表者")
     col送付先住所 = WM_GetColByHeader(ws表, "送付先住所")
     col送付先氏名 = WM_GetColByHeader(ws表, "送付先氏名")
+    col送付先郵便番号 = WM_GetColByHeader(ws表, "送付先郵便番号")
+    col郵便番号 = WM_GetColByHeader(ws表, "郵便番号")
     
     ' 必須列の存在チェック
     If col差込出力 = 0 Then
@@ -425,10 +480,19 @@ Public Sub 差込文書生成()
         MsgBox "見出し「代表者」が見つかりません。", vbExclamation
         Exit Sub
     End If
+    If col送付先郵便番号 = 0 Then
+        MsgBox "見出し「送付先郵便番号」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
+    If col郵便番号 = 0 Then
+        MsgBox "見出し「郵便番号」が見つかりません。", vbExclamation
+        Exit Sub
+    End If
     
     ' 最終行の取得（フィルタに影響されない実装）
     Dim lastRow差込出力 As Long, lastRow住所 As Long, lastRow業者 As Long, lastRow代表者 As Long
     Dim lastRow送付先住所 As Long, lastRow送付先氏名 As Long
+    Dim lastRow送付先郵便番号 As Long, lastRow郵便番号 As Long
     lastRow差込出力 = ws表.Cells(ws表.Rows.Count, col差込出力).End(xlUp).row
     lastRow住所 = ws表.Cells(ws表.Rows.Count, col住所).End(xlUp).row
     lastRow業者 = ws表.Cells(ws表.Rows.Count, col業者).End(xlUp).row
@@ -443,7 +507,9 @@ Public Sub 差込文書生成()
     Else
         lastRow送付先氏名 = 0
     End If
-    lastRow = Application.WorksheetFunction.Max(lastRow差込出力, lastRow住所, lastRow業者, lastRow代表者, lastRow送付先住所, lastRow送付先氏名)
+    lastRow送付先郵便番号 = ws表.Cells(ws表.Rows.Count, col送付先郵便番号).End(xlUp).row
+    lastRow郵便番号 = ws表.Cells(ws表.Rows.Count, col郵便番号).End(xlUp).row
+    lastRow = Application.WorksheetFunction.Max(lastRow差込出力, lastRow住所, lastRow業者, lastRow代表者, lastRow送付先住所, lastRow送付先氏名, lastRow送付先郵便番号, lastRow郵便番号)
     
     ' データ処理
     outRow = 2
@@ -455,7 +521,7 @@ Public Sub 差込文書生成()
         val差込出力 = Trim$(CStr(ws表.Cells(r, col差込出力).value))
         
         ' 差込文書出力フラグが何か入力されていたら対象
-        If Len(val差込出力) > 0 Then
+        If IsMeaningfulValue(val差込出力) Then
             val住所 = Trim$(CStr(ws表.Cells(r, col住所).value))
             val業者 = Trim$(CStr(ws表.Cells(r, col業者).value))
             val代表者 = Trim$(CStr(ws表.Cells(r, col代表者).value))
@@ -469,17 +535,28 @@ Public Sub 差込文書生成()
             Else
                 val送付先氏名 = ""
             End If
+            val送付先郵便番号 = Trim$(CStr(ws表.Cells(r, col送付先郵便番号).value))
+            val郵便番号 = Trim$(CStr(ws表.Cells(r, col郵便番号).value))
             
             ' 住所の優先ルール：送付先住所が空でなければ送付先住所、空なら住所
-            If Len(val送付先住所) > 0 Then
+            If IsMeaningfulValue(val送付先住所) Then
                 住所 = TrimRemoveNewlines(val送付先住所)
             Else
                 住所 = TrimRemoveNewlines(val住所)
             End If
+
+            ' 郵便番号の優先ルール：送付先郵便番号が空でなければ送付先郵便番号、空なら郵便番号
+            Dim 郵便番号ベース As String
+            If IsMeaningfulValue(val送付先郵便番号) Then
+                郵便番号ベース = val送付先郵便番号
+            Else
+                郵便番号ベース = val郵便番号
+            End If
+            郵便番号 = NormalizePostalCode(郵便番号ベース)
             
             ' 宛名の優先ルール：送付先氏名が空でなければ送付先氏名、空なら施工業者・債権者
             Dim 宛名ベース As String
-            If Len(val送付先氏名) > 0 Then
+            If IsMeaningfulValue(val送付先氏名) Then
                 宛名ベース = TrimRemoveNewlines(val送付先氏名)
             Else
                 宛名ベース = TrimRemoveNewlines(val業者)
@@ -512,19 +589,20 @@ Public Sub 差込文書生成()
                 End If
             End If
             
-            ' 空欄チェック（A列住所またはB列宛名が空欄なら除外）
-            If Len(住所) = 0 Or Len(宛名) = 0 Then
+            ' 空欄チェック（郵便番号/住所/宛名のいずれかが空欄なら除外）
+            If Len(郵便番号) = 0 Or Not IsMeaningfulValue(住所) Or Not IsMeaningfulValue(宛名) Then
                 cnt空欄 = cnt空欄 + 1
             Else
-                ' 重複チェック用キー（住所+宛名+敬称の完全一致）
-                key重複 = 住所 & "||" & 宛名 & "||" & 敬称
+                ' 重複チェック用キー（郵便番号+住所+宛名+敬称の完全一致）
+                key重複 = 郵便番号 & "||" & 住所 & "||" & 宛名 & "||" & 敬称
                 
                 ' 重複排除
                 If Not dict重複.Exists(key重複) Then
                     dict重複(key重複) = True
-                    ws差込.Cells(outRow, 1).value = 住所
-                    ws差込.Cells(outRow, 2).value = 宛名
-                    ws差込.Cells(outRow, 3).value = 敬称
+                    ws差込.Cells(outRow, 1).value = 郵便番号
+                    ws差込.Cells(outRow, 2).value = 住所
+                    ws差込.Cells(outRow, 3).value = 宛名
+                    ws差込.Cells(outRow, 4).value = 敬称
                     outRow = outRow + 1
                     cnt出力 = cnt出力 + 1
                 Else
@@ -586,4 +664,3 @@ EH:
     MsgBox "エラーが発生しました：" & Err.Description, vbCritical
 End Sub
 ' --- 後3行 ---
-
