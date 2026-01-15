@@ -366,6 +366,57 @@ End Function
 ' --- 後3行 ---
 
 ' --- 前3行 ---
+' 空白同義（記号やスペースのみ）を除いた有効値か判定
+Private Function IsMeaningfulValue(ByVal s As String) As Boolean
+    Dim cleaned As String
+    cleaned = TrimRemoveNewlines(s)
+    cleaned = Replace$(cleaned, " ", "")
+    cleaned = Replace$(cleaned, "　", "")
+    cleaned = Replace$(cleaned, "-", "")
+    cleaned = Replace$(cleaned, "－", "")
+    cleaned = Replace$(cleaned, "ー", "")
+    IsMeaningfulValue = (Len(cleaned) > 0)
+End Function
+' --- 後3行 ---
+
+' --- 前3行 ---
+' 郵便番号の正規化（〒 + 123-4567 形式を優先）
+Private Function NormalizePostalCode(ByVal s As String) As String
+    Dim cleaned As String
+    Dim digits As String
+    Dim i As Long
+    Dim ch As String
+
+    If Not IsMeaningfulValue(s) Then
+        NormalizePostalCode = ""
+        Exit Function
+    End If
+
+    cleaned = TrimRemoveNewlines(s)
+    cleaned = Replace$(cleaned, "〒", "")
+    cleaned = Replace$(cleaned, " ", "")
+    cleaned = Replace$(cleaned, "　", "")
+    cleaned = Replace$(cleaned, "-", "")
+    cleaned = Replace$(cleaned, "－", "")
+    cleaned = Replace$(cleaned, "ー", "")
+
+    digits = ""
+    For i = 1 To Len(cleaned)
+        ch = Mid$(cleaned, i, 1)
+        If ch >= "0" And ch <= "9" Then
+            digits = digits & ch
+        End If
+    Next i
+
+    If Len(digits) = 7 Then
+        NormalizePostalCode = "〒" & Left$(digits, 3) & "-" & Mid$(digits, 4, 4)
+    Else
+        NormalizePostalCode = ""
+    End If
+End Function
+' --- 後3行 ---
+
+' --- 前3行 ---
 ' 差込文書生成マクロ：表シートの差込文書出力フラグが立っている行を対象に、
 ' Word差し込み用のデータを「差込文書」シートへ生成する
 Public Sub 差込文書生成()
@@ -470,7 +521,7 @@ Public Sub 差込文書生成()
         val差込出力 = Trim$(CStr(ws表.Cells(r, col差込出力).value))
         
         ' 差込文書出力フラグが何か入力されていたら対象
-        If Len(val差込出力) > 0 Then
+        If IsMeaningfulValue(val差込出力) Then
             val住所 = Trim$(CStr(ws表.Cells(r, col住所).value))
             val業者 = Trim$(CStr(ws表.Cells(r, col業者).value))
             val代表者 = Trim$(CStr(ws表.Cells(r, col代表者).value))
@@ -488,7 +539,7 @@ Public Sub 差込文書生成()
             val郵便番号 = Trim$(CStr(ws表.Cells(r, col郵便番号).value))
             
             ' 住所の優先ルール：送付先住所が空でなければ送付先住所、空なら住所
-            If Len(val送付先住所) > 0 Then
+            If IsMeaningfulValue(val送付先住所) Then
                 住所 = TrimRemoveNewlines(val送付先住所)
             Else
                 住所 = TrimRemoveNewlines(val住所)
@@ -496,27 +547,16 @@ Public Sub 差込文書生成()
 
             ' 郵便番号の優先ルール：送付先郵便番号が空でなければ送付先郵便番号、空なら郵便番号
             Dim 郵便番号ベース As String
-            If Len(val送付先郵便番号) > 0 Then
-                郵便番号ベース = TrimRemoveNewlines(val送付先郵便番号)
+            If IsMeaningfulValue(val送付先郵便番号) Then
+                郵便番号ベース = val送付先郵便番号
             Else
-                郵便番号ベース = TrimRemoveNewlines(val郵便番号)
+                郵便番号ベース = val郵便番号
             End If
-            If Len(郵便番号ベース) > 0 Then
-                郵便番号ベース = Replace$(郵便番号ベース, "〒", "")
-                郵便番号ベース = Replace$(郵便番号ベース, " ", "")
-                郵便番号ベース = Replace$(郵便番号ベース, "　", "")
-                If Len(郵便番号ベース) > 0 Then
-                    郵便番号 = "〒" & 郵便番号ベース
-                Else
-                    郵便番号 = ""
-                End If
-            Else
-                郵便番号 = ""
-            End If
+            郵便番号 = NormalizePostalCode(郵便番号ベース)
             
             ' 宛名の優先ルール：送付先氏名が空でなければ送付先氏名、空なら施工業者・債権者
             Dim 宛名ベース As String
-            If Len(val送付先氏名) > 0 Then
+            If IsMeaningfulValue(val送付先氏名) Then
                 宛名ベース = TrimRemoveNewlines(val送付先氏名)
             Else
                 宛名ベース = TrimRemoveNewlines(val業者)
@@ -550,7 +590,7 @@ Public Sub 差込文書生成()
             End If
             
             ' 空欄チェック（郵便番号/住所/宛名のいずれかが空欄なら除外）
-            If Len(郵便番号) = 0 Or Len(住所) = 0 Or Len(宛名) = 0 Then
+            If Len(郵便番号) = 0 Or Not IsMeaningfulValue(住所) Or Not IsMeaningfulValue(宛名) Then
                 cnt空欄 = cnt空欄 + 1
             Else
                 ' 重複チェック用キー（郵便番号+住所+宛名+敬称の完全一致）
