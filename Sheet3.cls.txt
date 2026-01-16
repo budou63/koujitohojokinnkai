@@ -55,9 +55,8 @@ Private Sub Worksheet_Change(ByVal Target As Range)
         ' === 業者名入力時：代表者・住所を自動入力（見出し名ベースでズレない） ===
     Dim headerRow As Long: headerRow = 3
 
-    ' === 台帳編集者シートへの登録と「最終編集者」列の表示名反映（既存ロジックは変更しない） ===
-    currentUserId = Environ("USERNAME")
-    Call HandleEditorOnChange(Me, Target, colMap, currentUserId, headerRow)
+    ' === 編集行番号の記録（Undo維持のため、保存時にまとめて書き込む） ===
+    Call RecordEditedRows(Me, Target, headerRow)
 
     Dim col業者 As Long, col起案日 As Long, col代表者 As Long, col住所 As Long
 

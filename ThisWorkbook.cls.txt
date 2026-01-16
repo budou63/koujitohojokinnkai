@@ -11,6 +11,31 @@ Private Sub Workbook_Open()
     Application.OnTime Now + TimeValue("00:00:01"), "ShowHeaderPicker"
 End Sub
 
+' ===== 保存時に記録された行に最終編集者を書き込む（Undo維持のため） =====
+Private Sub Workbook_BeforeSave(ByVal SaveAsUI As Boolean, Cancel As Boolean)
+    On Error GoTo ErrorHandler
+    
+    ' 記録された行に最終編集者を書き込む
+    Dim success As Boolean
+    success = WriteLastEditorForRecordedRows()
+    
+    ' 保存がキャンセルされた場合やエラーの場合は記録をクリアしない
+    If Cancel Then
+        Exit Sub
+    End If
+    
+    ' 保存が成功した場合のみ記録をクリア
+    If success Then
+        Call ClearRecordedRows
+    End If
+    
+    Exit Sub
+    
+ErrorHandler:
+    ' エラー時も記録はクリアしない（次回保存時に再試行できるように）
+    On Error Resume Next
+End Sub
+
 
 
 

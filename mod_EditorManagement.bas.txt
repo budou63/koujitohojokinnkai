@@ -1,12 +1,19 @@
 Option Explicit
 
 ' 台帳編集者シートの管理と「最終編集者」列の更新をまとめたモジュール
-' Worksheet_Change から呼び出し、既存ロジックを汚さず最小限の責務で動作させる
+' 改修：Worksheet_Changeでは行番号を記録するだけ。保存時（BeforeSave）にまとめて書き込む（Undo維持のため）
 
 Private Const LEDGER_SHEET_NAME As String = "台帳編集者"
 Private Const HEADER_LAST_EDITOR As String = "最終編集者"
 Private Const HEADER_ROW_DEFAULT As Long = 3
 
+' 編集された行番号を記録するグローバル変数
+' Key=シート名、Value=行番号の集合（Scripting.Dictionary）
+Private gEditedRows As Object
+
+' ===== 旧関数（互換性のため残すが、通常は使用しない） =====
+' 注意：この関数は「最終編集者」列に即座に書き込むため、Undoが使えなくなる
+' 新規実装では RecordEditedRows と WriteLastEditorForRecordedRows を使用すること
 Public Sub HandleEditorOnChange(ByVal ws表 As Worksheet, ByVal Target As Range, _
                                 ByVal colMap As Object, ByVal editorId As String, _
                                 Optional ByVal headerRow As Long = HEADER_ROW_DEFAULT)
@@ -44,6 +51,151 @@ Public Sub HandleEditorOnChange(ByVal ws表 As Worksheet, ByVal Target As Range,
 
 CleanExit:
     On Error Resume Next
+End Sub
+
+' ===== 新規実装：行番号記録（Undo維持のため） =====
+' Worksheet_Changeから呼び出し、編集された行番号を記録するだけ
+Public Sub RecordEditedRows(ByVal ws表 As Worksheet, ByVal Target As Range, _
+                            Optional ByVal headerRow As Long = HEADER_ROW_DEFAULT)
+    On Error GoTo CleanExit
+    
+    ' グローバル変数の初期化（初回のみ）
+    If gEditedRows Is Nothing Then
+        Set gEditedRows = CreateObject("Scripting.Dictionary")
+    End If
+    
+    ' データ行（4行目以降）に交差しない変更は記録しない
+    Dim dataRange As Range
+    Set dataRange = Intersect(Target, ws表.Rows(headerRow + 1 & ":" & ws表.Rows.Count))
+    If dataRange Is Nothing Then GoTo CleanExit
+    
+    ' シート名をキーとして、行番号の集合を保持
+    Dim sheetName As String
+    sheetName = ws表.Name
+    
+    Dim rowSet As Object
+    If Not gEditedRows.Exists(sheetName) Then
+        Set rowSet = CreateObject("Scripting.Dictionary")
+        gEditedRows.Add sheetName, rowSet
+    Else
+        Set rowSet = gEditedRows(sheetName)
+    End If
+    
+    ' 編集された行番号を重複なく記録
+    Dim r As Range
+    For Each r In dataRange.Rows
+        If Not rowSet.Exists(r.Row) Then
+            rowSet.Add r.Row, True
+        End If
+    Next r
+    
+CleanExit:
+    On Error Resume Next
+End Sub
+
+' ===== 新規実装：保存時に記録された行に最終編集者を書き込む =====
+' BeforeSaveから呼び出し、記録されている行にまとめて書き込む
+' 戻り値：True=成功、False=エラー（Cancel=Trueの場合は呼び出し側で処理）
+Public Function WriteLastEditorForRecordedRows(Optional ByVal editorId As String = "") As Boolean
+    On Error GoTo ErrorHandler
+    
+    WriteLastEditorForRecordedRows = False
+    
+    ' 記録がなければ何もしない（成功として扱う）
+    If gEditedRows Is Nothing Then
+        WriteLastEditorForRecordedRows = True
+        Exit Function
+    End If
+    
+    If gEditedRows.Count = 0 Then
+        WriteLastEditorForRecordedRows = True
+        Exit Function
+    End If
+    
+    ' 編集者IDの取得
+    If editorId = "" Then
+        editorId = Environ("USERNAME")
+        ' もし全員administratorになる等の問題がある場合は以下に切り替え可能
+        ' editorId = Application.UserName
+    End If
+    
+    If editorId = "" Then
+        ' IDが取得できない場合は記録をクリアせずに終了
+        Exit Function
+    End If
+    
+    ' 台帳シートの取得
+    Dim wsLedger As Worksheet
+    Set wsLedger = GetLedgerSheet()
+    If wsLedger Is Nothing Then
+        ' 台帳シートがない場合は記録をクリアせずに終了
+        Exit Function
+    End If
+    
+    ' イベント制御の退避と無効化（再帰防止）
+    Dim eventsBefore As Boolean
+    eventsBefore = Application.EnableEvents
+    Application.EnableEvents = False
+    
+    ' IDを台帳に登録（重複は追加しない）
+    RegisterEditorIfMissing wsLedger, editorId
+    
+    ' 表示名の取得
+    Dim dispName As String
+    dispName = GetEditorDisplayName(wsLedger, editorId)
+    
+    ' 各シートの記録された行に書き込む
+    Dim sheetName As Variant
+    Dim rowSet As Object
+    Dim rowNum As Variant
+    Dim ws表 As Worksheet
+    Dim colMap As Object
+    Dim editorCol As Long
+    
+    For Each sheetName In gEditedRows.Keys
+        On Error Resume Next
+        Set ws表 = ThisWorkbook.Sheets(CStr(sheetName))
+        If ws表 Is Nothing Then GoTo NextSheet
+        
+        ' 見出し行から列マップを構築
+        Set colMap = BuildColumnMap(ws表, HEADER_ROW_DEFAULT)
+        
+        ' 「最終編集者」列の特定
+        editorCol = GetLastEditorColumn(ws表, colMap, HEADER_ROW_DEFAULT)
+        If editorCol = 0 Then GoTo NextSheet
+        
+        ' 記録された行に書き込む
+        Set rowSet = gEditedRows(sheetName)
+        For Each rowNum In rowSet.Keys
+            ws表.Cells(CLng(rowNum), editorCol).Value = dispName
+        Next rowNum
+        
+NextSheet:
+        On Error GoTo ErrorHandler
+    Next sheetName
+    
+    ' イベント制御を復元
+    Application.EnableEvents = eventsBefore
+    
+    WriteLastEditorForRecordedRows = True
+    Exit Function
+    
+ErrorHandler:
+    ' エラー時もイベント制御は復元
+    On Error Resume Next
+    Application.EnableEvents = eventsBefore
+    On Error GoTo 0
+    WriteLastEditorForRecordedRows = False
+End Function
+
+' ===== 記録された行番号をクリア =====
+' 保存成功時のみ呼び出す
+Public Sub ClearRecordedRows()
+    On Error Resume Next
+    If Not gEditedRows Is Nothing Then
+        gEditedRows.RemoveAll
+    End If
+    On Error GoTo 0
 End Sub
 
 ' --- 内部処理 ---
@@ -86,7 +238,27 @@ Private Function GetEditorDisplayName(ByVal wsLedger As Worksheet, ByVal editorI
     GetEditorDisplayName = editorId
 End Function
 
-Private Function GetLastEditorColumn(ByVal ws表 As Worksheet, ByVal colMap As Object, _
+' 見出し名から列マップを構築するヘルパー関数
+Private Function BuildColumnMap(ByVal ws表 As Worksheet, ByVal headerRow As Long) As Object
+    Dim colMap As Object
+    Set colMap = CreateObject("Scripting.Dictionary")
+    
+    Dim lastCol As Long, c As Long
+    lastCol = ws表.Cells(headerRow, ws表.Columns.Count).End(xlToLeft).Column
+    
+    For c = 1 To lastCol
+        Dim hdr As String
+        hdr = CStr(ws表.Cells(headerRow, c).Value)
+        If Trim$(hdr) <> "" Then
+            colMap(hdr) = c
+        End If
+    Next c
+    
+    Set BuildColumnMap = colMap
+End Function
+
+' GetLastEditorColumnをPublicに変更（保存時処理から呼び出すため）
+Public Function GetLastEditorColumn(ByVal ws表 As Worksheet, ByVal colMap As Object, _
     ByVal headerRow As Long) As Long
 
     ' colMap で完全一致を優先
@@ -114,6 +286,9 @@ Private Function GetLastEditorColumn(ByVal ws表 As Worksheet, ByVal colMap As O
             Exit Function
         End If
     Next c
+    
+    ' 見つからない場合は0を返す
+    GetLastEditorColumn = 0
 End Function
 
 Private Sub UpdateLastEditorForRows(ByVal ws表 As Worksheet, ByVal affectedRows As Range, _
