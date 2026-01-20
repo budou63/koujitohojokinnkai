@@ -837,7 +837,7 @@ Sub 転記とガントチャート生成_自動抽出付き()
 
     Dim ws表 As Worksheet, ws工期表 As Worksheet
     Dim lastRow表 As Long, lastRow工期表 As Long
-    Dim i As Long, j As Long, outRow As Long
+    Dim i As Long, j As Long
     Dim headerRow表 As Long: headerRow表 = 3
     Dim headerRow工期 As Long: headerRow工期 = 2
     Dim 転記コード As String, startDate As Date, endDate As Date
@@ -898,28 +898,8 @@ Sub 転記とガントチャート生成_自動抽出付き()
         End If
     Next c
     startCol = lastNonDateCol + 1   ' ★ここがガントの開始列（= 2行増えたら+2に自然に追従）
-    ' === 転記コード抽出（表シートの表示行のみ） ===
-    ws工期表.Range("A3:A1000").ClearContents
-    outRow = 3
+    ' === 転記コード抽出は行わない（工期表A列は手動貼り付け） ===
     lastRow表 = ws表.Cells(ws表.Rows.Count, 1).End(xlUp).row
-
-    Dim dataRange表 As Range, visibleRows表 As Range, rowRange表 As Range
-    Dim lastCol表 As Long
-    lastCol表 = ws表.Cells(headerRow表, ws表.Columns.Count).End(xlToLeft).Column
-    Set dataRange表 = ws表.Range(ws表.Cells(headerRow表 + 1, 1), ws表.Cells(lastRow表, lastCol表))
-    On Error Resume Next
-    Set visibleRows表 = dataRange表.SpecialCells(xlCellTypeVisible)
-    On Error GoTo 0
-
-    If Not visibleRows表 Is Nothing Then
-        For Each rowRange表 In visibleRows表.Rows
-            転記コード = Trim(ws表.Cells(rowRange表.Row, colMap表("転記")).value)
-            If 転記コード <> "" Then
-                ws工期表.Cells(outRow, 1).value = 転記コード
-                outRow = outRow + 1
-            End If
-        Next rowRange表
-    End If
 
     ' === 横軸（ガント日付＆月ラベル） ===
     For j = 0 To maxDays - 1
@@ -935,16 +915,15 @@ Sub 転記とガントチャート生成_自動抽出付き()
         End If
     Next j
 
-    ' === 転記コード → 表シートの行番号マッピング（表示行のみ） ===
-    If Not visibleRows表 Is Nothing Then
-        For Each rowRange表 In visibleRows表.Rows
-            転記コード = Trim(ws表.Cells(rowRange表.Row, colMap表("転記")).value)
-            If 転記コード <> "" Then dict表(転記コード) = rowRange表.Row
-        Next rowRange表
-    End If
+    ' === 転記コード → 表シートの行番号マッピング（全行対象） ===
+    For i = headerRow表 + 1 To lastRow表
+        転記コード = Trim(ws表.Cells(i, colMap表("転記")).value)
+        If 転記コード <> "" Then dict表(転記コード) = i
+    Next i
 
     ' === 転記＆ガントチャート描画 ===
     lastRow工期表 = ws工期表.Cells(ws工期表.Rows.Count, 1).End(xlUp).row
+    Dim missingCodes As String
 
     For i = headerRow工期 + 1 To lastRow工期表
         転記コード = Trim(ws工期表.Cells(i, colMap工期("転記コード")).value)
@@ -1006,9 +985,16 @@ Sub 転記とガントチャート生成_自動抽出付き()
                 Next j
             End If
         End If
+        If 転記コード <> "" And Not dict表.Exists(転記コード) Then
+            If missingCodes <> "" Then missingCodes = missingCodes & vbCrLf
+            missingCodes = missingCodes & "行" & i & ": " & 転記コード
+        End If
     Next i
 
     Application.ScreenUpdating = True
+    If missingCodes <> "" Then
+        MsgBox "表シートに存在しない転記コードがありました。" & vbCrLf & missingCodes, vbExclamation
+    End If
     MsgBox "転記とガントチャートの生成が完了しました！", vbInformation
 
 End Sub
