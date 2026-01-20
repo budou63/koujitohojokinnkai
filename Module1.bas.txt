@@ -837,14 +837,14 @@ Sub 転記とガントチャート生成_自動抽出付き()
 
     Dim ws表 As Worksheet, ws工期表 As Worksheet
     Dim lastRow表 As Long, lastRow工期表 As Long
-    Dim i As Long, j As Long, outRow As Long
+    Dim i As Long, j As Long
     Dim headerRow表 As Long: headerRow表 = 3
     Dim headerRow工期 As Long: headerRow工期 = 2
     Dim 転記コード As String, startDate As Date, endDate As Date
     Dim dict表 As Object: Set dict表 = CreateObject("Scripting.Dictionary")
     Dim colMap表 As Object: Set colMap表 = CreateObject("Scripting.Dictionary")
     Dim colMap工期 As Object: Set colMap工期 = CreateObject("Scripting.Dictionary")
-    Dim yearStr As String, baseYear As Integer, targetNendo As String, prevNendo As String
+    Dim yearStr As String, baseYear As Integer
     Dim baseDate As Date, maxDays As Long: maxDays = 730
     Dim startCol As Long  ' ★開始列は後で“見出し行2の最右非日付の次列”として決定
 
@@ -853,12 +853,10 @@ Sub 転記とガントチャート生成_自動抽出付き()
     Set ws表 = Worksheets("表")
     Set ws工期表 = Worksheets("工期表")
 
-    ' === 年度変換 ===
+    ' === 年度変換（ガント開始日の基準） ===
     yearStr = Trim(ws工期表.Range("J1").value)
     If yearStr Like "令和*年度" Then
         baseYear = val(Mid(yearStr, 3, Len(yearStr) - 4)) + 2018
-        targetNendo = "R" & val(Mid(yearStr, 3, Len(yearStr) - 4))
-        prevNendo = "R" & (val(Mid(yearStr, 3, Len(yearStr) - 4)) - 1)
     Else
         MsgBox "J1セルに「令和◯年度」の形式で入力してください。", vbExclamation
         Exit Sub
@@ -900,26 +898,8 @@ Sub 転記とガントチャート生成_自動抽出付き()
         End If
     Next c
     startCol = lastNonDateCol + 1   ' ★ここがガントの開始列（= 2行増えたら+2に自然に追従）
-    ' === 転記コード抽出（条件付き） ===
-    ws工期表.Range("A3:A1000").ClearContents
-    outRow = 3
+    ' === 転記コード抽出は行わない（工期表A列は手動貼り付け） ===
     lastRow表 = ws表.Cells(ws表.Rows.Count, 1).End(xlUp).row
-
-    For i = headerRow表 + 1 To lastRow表
-        Dim nendoVal As String: nendoVal = Trim(ws表.Cells(i, colMap表("年度")).value)
-        Dim 繰越明許 As String: 繰越明許 = Trim(ws表.Cells(i, colMap表("細々節〔繰越明許分〕")).value)
-        Dim 細々節 As String: 細々節 = Trim(ws表.Cells(i, colMap表("細々節")).value)
-        転記コード = Trim(ws表.Cells(i, colMap表("転記")).value)
-
-        If 転記コード <> "" Then
-            If (nendoVal = targetNendo Or (nendoVal = prevNendo And 繰越明許 <> "")) _
-               And InStr(細々節, "土地購入費") = 0 _
-               And InStr(繰越明許, "土地購入費") = 0 Then
-                ws工期表.Cells(outRow, 1).value = 転記コード
-                outRow = outRow + 1
-            End If
-        End If
-    Next i
 
     ' === 横軸（ガント日付＆月ラベル） ===
     For j = 0 To maxDays - 1
@@ -935,7 +915,7 @@ Sub 転記とガントチャート生成_自動抽出付き()
         End If
     Next j
 
-    ' === 転記コード → 表シートの行番号マッピング ===
+    ' === 転記コード → 表シートの行番号マッピング（全行対象） ===
     For i = headerRow表 + 1 To lastRow表
         転記コード = Trim(ws表.Cells(i, colMap表("転記")).value)
         If 転記コード <> "" Then dict表(転記コード) = i
@@ -943,6 +923,7 @@ Sub 転記とガントチャート生成_自動抽出付き()
 
     ' === 転記＆ガントチャート描画 ===
     lastRow工期表 = ws工期表.Cells(ws工期表.Rows.Count, 1).End(xlUp).row
+    Dim missingCodes As String
 
     For i = headerRow工期 + 1 To lastRow工期表
         転記コード = Trim(ws工期表.Cells(i, colMap工期("転記コード")).value)
@@ -1004,9 +985,16 @@ Sub 転記とガントチャート生成_自動抽出付き()
                 Next j
             End If
         End If
+        If 転記コード <> "" And Not dict表.Exists(転記コード) Then
+            If missingCodes <> "" Then missingCodes = missingCodes & vbCrLf
+            missingCodes = missingCodes & "行" & i & ": " & 転記コード
+        End If
     Next i
 
     Application.ScreenUpdating = True
+    If missingCodes <> "" Then
+        MsgBox "表シートに存在しない転記コードがありました。" & vbCrLf & missingCodes, vbExclamation
+    End If
     MsgBox "転記とガントチャートの生成が完了しました！", vbInformation
 
 End Sub
@@ -1311,5 +1299,3 @@ Private Sub SafeMove(ByVal src As String, ByVal dst As String)
     End If
     On Error GoTo 0
 End Sub
-
-
