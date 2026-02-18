@@ -1,3 +1,5 @@
+Option Explicit
+
 Private Sub CommandButton1_Click()
 
 End Sub
@@ -83,6 +85,8 @@ Private Sub Worksheet_Change(ByVal Target As Range)
         End If
     End If
 
+    ' === 住所入力時：郵便番号を過去データから自動補完（見出し名ベース） ===
+    Call AutoFillPostalCodeByAddress(Me, Target, headerRow, colMap)
 
     ' === 細々節の語尾追加 ===
     If 細々節列 > 0 Then
@@ -458,6 +462,72 @@ Public Sub GetLatestRepAddr(ws As Worksheet, headerRow As Long, _
 End Sub
 
 
+Public Function NormalizeAddressForMatch(ByVal s As String) As String
+    s = CStr(s)
+    s = Replace(s, vbCrLf, "")
+    s = Replace(s, vbCr, "")
+    s = Replace(s, vbLf, "")
+    s = Replace(s, " ", "")
+    s = Replace(s, "　", "")
+    s = Trim$(s)
+    NormalizeAddressForMatch = s
+End Function
 
+Public Function GetColByHeader(ByVal ws As Worksheet, ByVal headerName As String, ByVal headerRow As Long) As Long
+    Dim found As Range
+    Set found = ws.Rows(headerRow).Find(What:=headerName, LookIn:=xlValues, LookAt:=xlWhole, MatchCase:=False)
+    If Not found Is Nothing Then
+        GetColByHeader = found.Column
+    Else
+        GetColByHeader = 0
+    End If
+End Function
 
+Public Sub AutoFillPostalCodeByAddress(ByVal ws As Worksheet, ByVal Target As Range, ByVal headerRow As Long, ByVal colMap As Object)
+    Dim col住所 As Long, col郵便番号 As Long
+    Dim rng住所 As Range, c As Range
+    Dim currentRow As Long, lastRow As Long, r As Long
+    Dim inputAddressNorm As String, pastAddressNorm As String
+    Dim postalValue As String
+
+    col住所 = 0
+    If Not colMap Is Nothing Then col住所 = ColFrom(colMap, "住所")
+    If col住所 = 0 Then col住所 = GetColByHeader(ws, "住所", headerRow)
+
+    col郵便番号 = 0
+    If Not colMap Is Nothing Then col郵便番号 = ColFrom(colMap, "郵便番号")
+    If col郵便番号 = 0 Then col郵便番号 = GetColByHeader(ws, "郵便番号", headerRow)
+
+    If col住所 = 0 Or col郵便番号 = 0 Then Exit Sub
+
+    Set rng住所 = Intersect(Target, ws.Range(ws.Cells(headerRow + 1, col住所), ws.Cells(ws.Rows.Count, col住所)))
+    If rng住所 Is Nothing Then Exit Sub
+
+    lastRow = ws.Cells(ws.Rows.Count, col住所).End(xlUp).row
+    If lastRow < headerRow + 1 Then Exit Sub
+
+    For Each c In rng住所.Cells
+        currentRow = c.row
+        If currentRow < headerRow + 1 Then GoTo NextCell
+
+        inputAddressNorm = NormalizeAddressForMatch(CStr(c.Value))
+        If inputAddressNorm = "" Then GoTo NextCell
+
+        If Trim$(CStr(ws.Cells(currentRow, col郵便番号).Value)) <> "" Then GoTo NextCell
+
+        For r = lastRow To headerRow + 1 Step -1
+            If r <> currentRow Then
+                pastAddressNorm = NormalizeAddressForMatch(CStr(ws.Cells(r, col住所).Value))
+                If pastAddressNorm <> "" And pastAddressNorm = inputAddressNorm Then
+                    postalValue = Trim$(CStr(ws.Cells(r, col郵便番号).Value))
+                    If postalValue <> "" Then
+                        ws.Cells(currentRow, col郵便番号).Value = postalValue
+                        Exit For
+                    End If
+                End If
+            End If
+        Next r
+NextCell:
+    Next c
+End Sub
 
