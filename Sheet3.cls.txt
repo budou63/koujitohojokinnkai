@@ -37,6 +37,9 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     ' ▼ どの編集でもまずログ＆黄色塗り（表シートかどうかは中で判定）
     Call LogEditAndHighlight(Target)
 
+    ' ▼ 金額3（EL列）変更時のみ、同一行の検査員（EP列）を自動色分け
+    Call UpdateInspectorColorByAmount3(Target)
+
     繰越語尾 = "〔繰越明許分〕"
 
 
@@ -323,6 +326,73 @@ ErrorHandler:
 End Sub
 
 '---------------------------------------------
+' 金額3（EL列）の金額に応じて、検査員（EP列）を色分け
+' ※金額3が未入力/数値解釈不可なら EP は一切変更しない
+'---------------------------------------------
+Private Sub UpdateInspectorColorByAmount3(ByVal Target As Range)
+    Dim rngAmount3 As Range
+    Dim c As Range
+    Dim amount3 As Double
+    Dim inspectorCell As Range
+
+    Set rngAmount3 = Intersect(Target, Me.Columns("EL"))
+    If rngAmount3 Is Nothing Then Exit Sub
+
+    For Each c In rngAmount3.Cells
+        ' データ行のみ対象（見出し行等は除外）
+        If c.row >= 4 Then
+            If TryParseAmount3(c.Value, amount3) Then
+                Set inspectorCell = Me.Cells(c.row, "EP")
+
+                Select Case amount3
+                    Case Is >= 5000000
+                        ' 部長区分: 薄い赤 (RGB: 255, 199, 206)
+                        inspectorCell.Interior.Color = RGB(255, 199, 206)
+                    Case Is >= 500000
+                        ' 課長区分: 薄いオレンジ (RGB: 244, 176, 132)
+                        inspectorCell.Interior.Color = RGB(244, 176, 132)
+                    Case Is >= 200000
+                        ' 係長・主任区分: 薄い青 (RGB: 189, 215, 238)
+                        inspectorCell.Interior.Color = RGB(189, 215, 238)
+                    Case Else
+                        ' 担当職員区分: 薄い灰色 (RGB: 217, 217, 217)
+                        inspectorCell.Interior.Color = RGB(217, 217, 217)
+                End Select
+            End If
+        End If
+    Next c
+End Sub
+
+Private Function TryParseAmount3(ByVal v As Variant, ByRef amount As Double) As Boolean
+    Dim s As String
+
+    If IsError(v) Then Exit Function
+    If IsEmpty(v) Then Exit Function
+
+    If IsNumeric(v) Then
+        amount = CDbl(v)
+        TryParseAmount3 = True
+        Exit Function
+    End If
+
+    s = Trim$(CStr(v))
+    If s = "" Then Exit Function
+
+    ' 表示ゆれ対策（カンマ・通貨記号・空白を除去）
+    s = Replace(s, ",", "")
+    s = Replace(s, "，", "")
+    s = Replace(s, "¥", "")
+    s = Replace(s, "￥", "")
+    s = Replace(s, " ", "")
+    s = Replace(s, "　", "")
+
+    If IsNumeric(s) Then
+        amount = CDbl(s)
+        TryParseAmount3 = True
+    End If
+End Function
+
+'---------------------------------------------
 ' 選択変更時：1行目の通し番号と見出し列数を比較し、ズレていたら更新
 '---------------------------------------------
 Private Sub Worksheet_SelectionChange(ByVal Target As Range)
@@ -530,4 +600,3 @@ Public Sub AutoFillPostalCodeByAddress(ByVal ws As Worksheet, ByVal Target As Ra
 NextCell:
     Next c
 End Sub
-
