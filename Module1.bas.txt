@@ -4,6 +4,7 @@ Option Explicit
 Private Const OUT_DIR As String = "\\filesv15\土木課\工事と補助金台帳\"   ' ★ここを変更
 Private Const FLAT_DIR As String = OUT_DIR & "flat\"  ' 転送用の集約フォルダ
 Private Const CSV_LATEST As String = OUT_DIR & "csv\結合CSV_latest.csv"  ' ★QGISが参照する固定CSV
+Private Const CSV_KOUJI_LATEST As String = OUT_DIR & "csv\工事CSV_latest.csv"  ' ★工事CSV固定CSV
 
 ' ==== manifest 出力先（新規） ====
 Private Const MANIFEST_DIR As String = OUT_DIR & "manifest\"
@@ -446,6 +447,165 @@ Sub 結合CSV出力()
 
 End Sub
 
+Public Sub 工事CSV出力()
+
+    Dim ws表 As Worksheet, ws出力 As Worksheet
+    Dim headerRow As Long: headerRow = 3
+    Dim dataStartRow As Long: dataStartRow = 4
+    Dim lastRow As Long, lastCol As Long
+    Dim row As Long, outRow As Long, i As Long
+    Dim colMap As Object: Set colMap = CreateObject("Scripting.Dictionary")
+    Dim requiredHeaders As Variant
+    Dim outputHeaders As Variant
+    Dim requiredCols() As Long
+    Dim miss As String
+    Dim srcCell As Range
+
+    Set ws表 = ThisWorkbook.Sheets("表")
+    Set ws出力 = ThisWorkbook.Sheets("工事CSV")
+
+    ' === 見出し辞書を作成（列追加に耐えるよう、列位置ではなく見出し名で管理） ===
+    lastCol = ws表.Cells(headerRow, ws表.Columns.Count).End(xlToLeft).Column
+    For i = 1 To lastCol
+        Dim headerKey As String
+        headerKey = NormalizeHeader(ws表.Cells(headerRow, i).Value)
+        If headerKey <> "" Then colMap(headerKey) = i
+    Next i
+
+    ' === 必須見出し一覧（この順で requiredCols に格納） ===
+    requiredHeaders = Array( _
+        "工事CSV", "転記", "年度", "契約年月日", "件名", "施工業者・債権者", _
+        "代表者", "住所", "担当者", "始（最終）", "終（最終）", _
+        "当初設計金額（合計）", "当初債務負担額（合計）", "最終設計金額（合計）", _
+        "最終債務負担額（合計）", "補助対象額（事業費ベース）", "補助額（国費ベース）", _
+        "単市（合計）", "工事内容（最終）", "竣工年月日", "検査・登記確認年月日", _
+        "検査立会人", "検査員", "支払残額", "支払済額")
+
+    ReDim requiredCols(LBound(requiredHeaders) To UBound(requiredHeaders))
+    For i = LBound(requiredHeaders) To UBound(requiredHeaders)
+        requiredCols(i) = MapGetCol(colMap, CStr(requiredHeaders(i)))
+        If requiredCols(i) = 0 Then
+            miss = miss & "・" & CStr(requiredHeaders(i)) & vbCrLf
+        End If
+    Next i
+
+    If Len(miss) > 0 Then
+        MsgBox "工事CSV出力に必要な見出しが見つかりません。" & vbCrLf & vbCrLf & miss, vbExclamation
+        Exit Sub
+    End If
+
+    ' === 出力シートを初期化し、1行目に見出しを設定 ===
+    ws出力.Cells.ClearContents
+    outputHeaders = Array( _
+        "転記", "年度", "契約年月日", "件名", "施工業者・債権者", "代表者", "住所", "担当者", _
+        "始（最終）", "終（最終）", "当初設計金額（合計）", "当初債務負担額（合計）", _
+        "最終設計金額（合計）", "最終債務負担額（合計）", "補助対象額（事業費ベース）", _
+        "補助額（国費ベース）", "単市（合計）", "工事内容（最終）", "竣工年月日", _
+        "検査・登記確認年月日", "検査立会人", "検査員", "支払残額", "支払済額", "完了判定")
+
+    For i = LBound(outputHeaders) To UBound(outputHeaders)
+        ws出力.Cells(1, i + 1).Value = outputHeaders(i)
+    Next i
+
+    lastRow = GetLastDataRow(ws表, headerRow, colMap)
+    outRow = 2
+
+    ' === 抽出条件：工事CSV列が「〇」の行のみ、1案件1行で出力 ===
+    For row = dataStartRow To lastRow
+        If Nml(ws表.Cells(row, requiredCols(0)).Value) = "〇" Then
+            For i = 1 To UBound(requiredCols)
+                ws出力.Cells(outRow, i).Value = ws表.Cells(row, requiredCols(i)).Value
+            Next i
+
+            Set srcCell = ws表.Cells(row, requiredCols(1)) ' requiredCols(1) = 転記列
+            If IsKoujiCompletedCell(srcCell) Then
+                ws出力.Cells(outRow, 25).Value = "工事完了"
+            Else
+                ws出力.Cells(outRow, 25).ClearContents
+            End If
+
+            outRow = outRow + 1
+        End If
+    Next row
+
+    If outRow = 2 Then
+        MsgBox "工事CSVの出力対象データがありません。", vbExclamation
+        Exit Sub
+    End If
+
+    ExportSheetToUtf8Csv ws出力, CSV_KOUJI_LATEST, OUT_DIR & "csv\工事CSV_" & Format(Now, "yyyymmdd_HHmm") & ".csv", "工事CSV"
+
+End Sub
+
+Private Sub ExportSheetToUtf8Csv(ByVal wsSource As Worksheet, ByVal latestPath As String, ByVal snapPath As String, ByVal csvLabel As String)
+
+    Dim exportBook As Workbook
+    Dim exportSheet As Worksheet
+    Dim tempPath As String
+    Dim timeStamp As String
+
+    timeStamp = Format(Now, "yyyymmdd_HHmm")
+    tempPath = Environ$("TEMP") & "\" & csvLabel & "_tmp_" & timeStamp & ".csv"
+
+    Mk OUT_DIR
+    Mk OUT_DIR & "csv\"
+
+    Set exportBook = Workbooks.Add
+    Set exportSheet = exportBook.Sheets(1)
+    wsSource.UsedRange.Copy Destination:=exportSheet.Range("A1")
+
+    Application.DisplayAlerts = False
+    exportBook.SaveAs FileName:=tempPath, FileFormat:=xlCSVUTF8, Local:=True
+    exportBook.Close SaveChanges:=False
+    Application.DisplayAlerts = True
+
+    If Len(Dir$(tempPath)) = 0 Then
+        MsgBox "一時CSVの作成に失敗しました: " & tempPath, vbExclamation
+        Exit Sub
+    End If
+
+    On Error Resume Next
+    Kill latestPath
+    On Error GoTo 0
+
+    FileCopy tempPath, latestPath
+    FileCopy tempPath, snapPath
+    On Error Resume Next
+    Kill tempPath
+    On Error GoTo 0
+
+    MsgBox csvLabel & "のCSV出力が完了しました。" & vbCrLf & _
+           "固定: " & latestPath & vbCrLf & _
+           "スナップショット: " & snapPath, vbInformation
+
+End Sub
+
+Private Function GetLastDataRow(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal colMap As Object) As Long
+    Dim key As Variant
+    Dim col As Long
+    Dim lastRow As Long
+
+    lastRow = headerRow + 1
+    For Each key In colMap.Keys
+        col = CLng(colMap(key))
+        lastRow = Application.WorksheetFunction.Max(lastRow, ws.Cells(ws.Rows.Count, col).End(xlUp).Row)
+    Next key
+
+    GetLastDataRow = lastRow
+End Function
+
+Private Function IsKoujiCompletedCell(ByVal targetCell As Range) As Boolean
+    Dim fontColor As Long
+
+    If targetCell Is Nothing Then Exit Function
+
+    fontColor = targetCell.Font.Color
+
+    ' 赤文字判定はまず RGB(255, 0, 0) を基準にしています。
+    ' テーマカラー等で別の赤コードが使われている場合は、ここに Or 条件を追加してください。
+    ' 例: If fontColor = RGB(255, 0, 0) Or fontColor = RGB(192, 0, 0) Then ...
+    IsKoujiCompletedCell = (targetCell.Font.Bold = True And fontColor = RGB(255, 0, 0))
+End Function
 
 
 
