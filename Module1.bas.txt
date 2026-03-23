@@ -460,6 +460,9 @@ Public Sub 工事CSV出力()
     Dim requiredCols() As Long
     Dim miss As String
     Dim srcCell As Range
+    Dim outputLastRowBefore As Long, outputLastRowAfter As Long
+    Dim defaultDataRowHeight As Double
+    Dim rowHeights() As Double
 
     Set ws表 = ThisWorkbook.Sheets("表")
     Set ws出力 = ThisWorkbook.Sheets("工事CSV")
@@ -493,6 +496,16 @@ Public Sub 工事CSV出力()
         MsgBox "工事CSV出力に必要な見出しが見つかりません。" & vbCrLf & vbCrLf & miss, vbExclamation
         Exit Sub
     End If
+
+    ' === 出力前の行高を保持する（改行入り文字列で自動拡張されても後で戻せるようにする） ===
+    outputLastRowBefore = GetSheetLastUsedRow(ws出力)
+    If outputLastRowBefore < 2 Then outputLastRowBefore = 2
+
+    defaultDataRowHeight = ws出力.Rows(2).RowHeight
+    ReDim rowHeights(2 To outputLastRowBefore)
+    For row = 2 To outputLastRowBefore
+        rowHeights(row) = ws出力.Rows(row).RowHeight
+    Next row
 
     ' === 出力シートを初期化し、1行目に見出しを設定 ===
     ws出力.Cells.ClearContents
@@ -532,6 +545,16 @@ Public Sub 工事CSV出力()
         MsgBox "工事CSVの出力対象データがありません。", vbExclamation
         Exit Sub
     End If
+
+    ' === 出力後に2行目以降の行高を出力前の高さへ戻す ===
+    outputLastRowAfter = Application.WorksheetFunction.Max(outputLastRowBefore, outRow - 1, 2)
+    For row = 2 To outputLastRowAfter
+        If row <= outputLastRowBefore Then
+            ws出力.Rows(row).RowHeight = rowHeights(row)
+        Else
+            ws出力.Rows(row).RowHeight = defaultDataRowHeight
+        End If
+    Next row
 
     ExportSheetToUtf8Csv ws出力, CSV_KOUJI_LATEST, OUT_DIR & "csv\工事CSV_" & Format(Now, "yyyymmdd_HHmm") & ".csv", "工事CSV"
 
@@ -579,6 +602,21 @@ Private Sub ExportSheetToUtf8Csv(ByVal wsSource As Worksheet, ByVal latestPath A
            "スナップショット: " & snapPath, vbInformation
 
 End Sub
+
+Private Function GetSheetLastUsedRow(ByVal ws As Worksheet) As Long
+    Dim lastCell As Range
+
+    On Error Resume Next
+    Set lastCell = ws.Cells.Find(What:="*", After:=ws.Cells(1, 1), LookIn:=xlFormulas, _
+                                 LookAt:=xlPart, SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
+    On Error GoTo 0
+
+    If lastCell Is Nothing Then
+        GetSheetLastUsedRow = 1
+    Else
+        GetSheetLastUsedRow = lastCell.Row
+    End If
+End Function
 
 Private Function GetLastDataRow(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal colMap As Object) As Long
     Dim key As Variant
