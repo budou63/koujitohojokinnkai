@@ -274,6 +274,11 @@ Private Sub CommandButton5_Click()
     Call A列に金額情報をコメント表示
 End Sub
 
+Private Sub CommandButton6_Click()
+    ' 標準モジュールのマクロを呼び出す
+    Call 工事CSV出力
+End Sub
+
 
 Private Sub UserForm_Initialize()
     ' サイズ固定したいならここで指定（任意）
@@ -579,6 +584,5 @@ Private Function GetColByHeaderLocal(ByVal ws As Worksheet, ByVal headerName As 
     Next
     GetColByHeaderLocal = 0
 End Function
-
 
 
