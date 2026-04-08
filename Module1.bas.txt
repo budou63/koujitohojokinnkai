@@ -219,9 +219,8 @@ Public Sub RefreshSnapshotFromTable()
     ' 1) 値を先に固定転記（数式は持ち込まない）
     dstRange.Value = srcRange.Value
 
-    ' 2) 書式転記（結合はここで持ち込まず、後段で明示的に再現）
-    srcRange.Copy
-    dstRange.PasteSpecial Paste:=xlPasteFormats
+    ' 2) 書式転記（PasteSpecialは結合セルで失敗しやすいためセル単位で安全に反映）
+    CopyRangeFormatsWithoutPaste srcRange, dstRange
 
     ' 3) 列幅・行高を反映
     For c = 1 To srcRange.Columns.Count
@@ -244,8 +243,6 @@ Public Sub RefreshSnapshotFromTable()
 
     ' 6) 印刷設定を引き継ぎ
     CopyPageSetup wsSrc, wsSnap
-
-    Application.CutCopyMode = False
 
 SafeExit:
     On Error Resume Next
@@ -289,6 +286,61 @@ Private Sub RebuildMergedAreas(ByVal wsSnap As Worksheet, ByVal srcRange As Rang
             End If
         End If
     Next c
+End Sub
+
+'--- PasteSpecialを使わずに書式を転記（結合セル混在時のエラー回避）
+Private Sub CopyRangeFormatsWithoutPaste(ByVal srcRange As Range, ByVal dstRange As Range)
+    Dim r As Long, c As Long
+    Dim srcCell As Range, dstCell As Range
+    Dim b As Variant
+    Dim borderIds As Variant
+
+    borderIds = Array(xlEdgeLeft, xlEdgeTop, xlEdgeBottom, xlEdgeRight, xlInsideVertical, xlInsideHorizontal)
+
+    For r = 1 To srcRange.Rows.Count
+        For c = 1 To srcRange.Columns.Count
+            Set srcCell = srcRange.Cells(r, c)
+            Set dstCell = dstRange.Cells(r, c)
+
+            With dstCell
+                .NumberFormatLocal = srcCell.NumberFormatLocal
+                .HorizontalAlignment = srcCell.HorizontalAlignment
+                .VerticalAlignment = srcCell.VerticalAlignment
+                .WrapText = srcCell.WrapText
+                .Orientation = srcCell.Orientation
+                .AddIndent = srcCell.AddIndent
+                .IndentLevel = srcCell.IndentLevel
+                .ShrinkToFit = srcCell.ShrinkToFit
+                .ReadingOrder = srcCell.ReadingOrder
+            End With
+
+            With dstCell.Font
+                .Name = srcCell.Font.Name
+                .Size = srcCell.Font.Size
+                .Bold = srcCell.Font.Bold
+                .Italic = srcCell.Font.Italic
+                .Underline = srcCell.Font.Underline
+                .Color = srcCell.Font.Color
+            End With
+
+            With dstCell.Interior
+                .Pattern = srcCell.Interior.Pattern
+                .PatternColorIndex = srcCell.Interior.PatternColorIndex
+                .Color = srcCell.Interior.Color
+                .TintAndShade = srcCell.Interior.TintAndShade
+                .PatternTintAndShade = srcCell.Interior.PatternTintAndShade
+            End With
+
+            For Each b In borderIds
+                With dstCell.Borders(b)
+                    .LineStyle = srcCell.Borders(b).LineStyle
+                    .Weight = srcCell.Borders(b).Weight
+                    .Color = srcCell.Borders(b).Color
+                    .TintAndShade = srcCell.Borders(b).TintAndShade
+                End With
+            Next b
+        Next c
+    Next r
 End Sub
 
 '--- PDF出力を「スナップショット」対象で実行
