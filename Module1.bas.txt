@@ -182,6 +182,146 @@ Private Sub SaveWorkbookSnapshot()
     ThisWorkbook.SaveCopyAs outPath
 End Sub
 
+'--- 「表」を既存「スナップショット」へ固定コピー（値・書式・列幅・行高・非表示・結合・印刷設定）
+Public Sub RefreshSnapshotFromTable()
+    Dim wsSrc As Worksheet, wsSnap As Worksheet
+    Dim srcRange As Range
+    Dim calcBefore As XlCalculation
+    Dim eventsBefore As Boolean, screenBefore As Boolean, alertsBefore As Boolean
+    Dim r As Long, c As Long
+
+    On Error GoTo EH
+
+    Set wsSrc = ThisWorkbook.Worksheets("表")
+    Set wsSnap = ThisWorkbook.Worksheets("スナップショット")
+    Set srcRange = wsSrc.UsedRange
+
+    eventsBefore = Application.EnableEvents
+    screenBefore = Application.ScreenUpdating
+    alertsBefore = Application.DisplayAlerts
+    calcBefore = Application.Calculation
+
+    Application.EnableEvents = False
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+    Application.Calculation = xlCalculationManual
+
+    ' 毎回上書きするため既存内容をクリア（シートは削除しない）
+    wsSnap.Cells.Clear
+    wsSnap.Cells.EntireColumn.Hidden = False
+    wsSnap.Cells.EntireRow.Hidden = False
+
+    ' 1) 見た目をコピー（書式/罫線/表示形式/結合状態を含む）
+    srcRange.Copy
+    wsSnap.Range("A1").PasteSpecial Paste:=xlPasteAll
+
+    ' 2) 数式を値で固定（表示結果を凍結）
+    With wsSnap.Range("A1").Resize(srcRange.Rows.Count, srcRange.Columns.Count)
+        .Value = .Value
+    End With
+
+    ' 3) 列幅・行高を反映
+    For c = 1 To srcRange.Columns.Count
+        wsSnap.Columns(c).ColumnWidth = wsSrc.Columns(c).ColumnWidth
+    Next c
+    For r = 1 To srcRange.Rows.Count
+        wsSnap.Rows(r).RowHeight = wsSrc.Rows(r).RowHeight
+    Next r
+
+    ' 4) 行・列の非表示状態を反映
+    For c = 1 To srcRange.Columns.Count
+        wsSnap.Columns(c).Hidden = wsSrc.Columns(c).Hidden
+    Next c
+    For r = 1 To srcRange.Rows.Count
+        wsSnap.Rows(r).Hidden = wsSrc.Rows(r).Hidden
+    Next r
+
+    ' 5) 印刷設定を引き継ぎ
+    CopyPageSetup wsSrc, wsSnap
+
+    Application.CutCopyMode = False
+
+SafeExit:
+    On Error Resume Next
+    Application.EnableEvents = eventsBefore
+    Application.ScreenUpdating = screenBefore
+    Application.DisplayAlerts = alertsBefore
+    Application.Calculation = calcBefore
+    On Error GoTo 0
+    Exit Sub
+
+EH:
+    MsgBox "スナップショット作成中にエラーが発生しました: " & Err.Description, vbExclamation
+    Resume SafeExit
+End Sub
+
+'--- PDF出力を「スナップショット」対象で実行
+Public Sub ExportSnapshotToPdf(ByVal pdfPath As String)
+    Dim wsSnap As Worksheet
+    On Error GoTo EH
+
+    RefreshSnapshotFromTable
+    Set wsSnap = ThisWorkbook.Worksheets("スナップショット")
+
+    wsSnap.ExportAsFixedFormat Type:=xlTypePDF, _
+                               fileName:=pdfPath, _
+                               Quality:=xlQualityStandard, _
+                               IncludeDocProperties:=True, _
+                               IgnorePrintAreas:=False, _
+                               OpenAfterPublish:=False
+    Exit Sub
+EH:
+    MsgBox "PDF出力に失敗しました: " & Err.Description, vbExclamation
+End Sub
+
+'--- Excel出力を「スナップショット」対象で実行（単一シートの新規ブック保存）
+Public Sub ExportSnapshotToExcel(ByVal xlsxPath As String)
+    Dim wsSnap As Worksheet
+    Dim wbOut As Workbook
+    On Error GoTo EH
+
+    RefreshSnapshotFromTable
+    Set wsSnap = ThisWorkbook.Worksheets("スナップショット")
+
+    Set wbOut = Workbooks.Add(xlWBATWorksheet)
+    wsSnap.Copy Before:=wbOut.Worksheets(1)
+    Application.DisplayAlerts = False
+    wbOut.Worksheets(wbOut.Worksheets.Count).Delete
+    Application.DisplayAlerts = True
+
+    wbOut.SaveAs fileName:=xlsxPath, FileFormat:=xlOpenXMLWorkbook
+    wbOut.Close SaveChanges:=False
+    Exit Sub
+EH:
+    On Error Resume Next
+    Application.DisplayAlerts = True
+    If Not wbOut Is Nothing Then wbOut.Close SaveChanges:=False
+    On Error GoTo 0
+    MsgBox "Excel出力に失敗しました: " & Err.Description, vbExclamation
+End Sub
+
+'--- 印刷設定の主要項目をコピー
+Private Sub CopyPageSetup(ByVal wsFrom As Worksheet, ByVal wsTo As Worksheet)
+    With wsTo.PageSetup
+        .PrintArea = wsFrom.PageSetup.PrintArea
+        .PrintTitleRows = wsFrom.PageSetup.PrintTitleRows
+        .PrintTitleColumns = wsFrom.PageSetup.PrintTitleColumns
+        .Orientation = wsFrom.PageSetup.Orientation
+        .PaperSize = wsFrom.PageSetup.PaperSize
+        .Zoom = wsFrom.PageSetup.Zoom
+        .FitToPagesWide = wsFrom.PageSetup.FitToPagesWide
+        .FitToPagesTall = wsFrom.PageSetup.FitToPagesTall
+        .LeftMargin = wsFrom.PageSetup.LeftMargin
+        .RightMargin = wsFrom.PageSetup.RightMargin
+        .TopMargin = wsFrom.PageSetup.TopMargin
+        .BottomMargin = wsFrom.PageSetup.BottomMargin
+        .HeaderMargin = wsFrom.PageSetup.HeaderMargin
+        .FooterMargin = wsFrom.PageSetup.FooterMargin
+        .CenterHorizontally = wsFrom.PageSetup.CenterHorizontally
+        .CenterVertically = wsFrom.PageSetup.CenterVertically
+    End With
+End Sub
+
 '========== ユーティリティ ==========
 Private Sub Mk(p As String)
     If Len(Dir(p, vbDirectory)) = 0 Then MkDir p
