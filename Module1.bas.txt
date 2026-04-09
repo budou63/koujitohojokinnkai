@@ -182,6 +182,321 @@ Private Sub SaveWorkbookSnapshot()
     ThisWorkbook.SaveCopyAs outPath
 End Sub
 
+'--- 「表」を既存「スナップショット」へ固定コピー（値・書式・列幅・行高・非表示・結合・印刷設定）
+Public Sub RefreshSnapshotFromTable()
+    Dim wsSrc As Worksheet, wsSnap As Worksheet
+    Dim srcRange As Range, dstRange As Range
+    Dim visRows As Collection, visCols As Collection
+    Dim rowMap As Object, colMap As Object
+    Dim dataArr() As Variant
+    Dim calcBefore As XlCalculation
+    Dim eventsBefore As Boolean, screenBefore As Boolean, alertsBefore As Boolean
+    Dim r As Long, c As Long
+    Dim sr As Long, sc As Long
+    Dim nRows As Long, nCols As Long
+
+    On Error GoTo EH
+
+    Set wsSrc = ThisWorkbook.Worksheets("表")
+    Set wsSnap = ThisWorkbook.Worksheets("スナップショット")
+    Set srcRange = wsSrc.UsedRange
+    Set visRows = CollectVisibleRowNumbers(wsSrc, srcRange)
+    Set visCols = CollectVisibleColumnNumbers(wsSrc, srcRange)
+
+    If visRows.Count = 0 Or visCols.Count = 0 Then
+        MsgBox "表示されているセルがありません。", vbExclamation
+        Exit Sub
+    End If
+
+    eventsBefore = Application.EnableEvents
+    screenBefore = Application.ScreenUpdating
+    alertsBefore = Application.DisplayAlerts
+    calcBefore = Application.Calculation
+
+    Application.EnableEvents = False
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+    Application.Calculation = xlCalculationManual
+
+    ' 毎回上書きするため既存内容をクリア（シートは削除しない）
+    ' ※結合セルエラー回避のため、先に全結合を解除してからクリアする
+    wsSnap.Cells.UnMerge
+    wsSnap.Cells.Clear
+    wsSnap.Cells.EntireColumn.Hidden = False
+    wsSnap.Cells.EntireRow.Hidden = False
+
+    nRows = visRows.Count
+    nCols = visCols.Count
+    Set dstRange = wsSnap.Range("A1").Resize(nRows, nCols)
+
+    ReDim dataArr(1 To nRows, 1 To nCols)
+
+    ' 1) 表示セルだけを詰めて値固定転記（数式は持ち込まない）
+    For r = 1 To nRows
+        sr = CLng(visRows(r))
+        For c = 1 To nCols
+            sc = CLng(visCols(c))
+            dataArr(r, c) = wsSrc.Cells(sr, sc).Value
+        Next c
+    Next r
+    dstRange.Value = dataArr
+
+    ' 2) 表示セルだけの書式をセル単位で反映（PasteSpecialは使わない）
+    CopyVisibleFormats wsSrc, wsSnap, visRows, visCols
+
+    ' 3) 列幅・行高は表示分のみ左から順に反映
+    For c = 1 To nCols
+        sc = CLng(visCols(c))
+        wsSnap.Columns(c).ColumnWidth = wsSrc.Columns(sc).ColumnWidth
+    Next c
+    For r = 1 To nRows
+        sr = CLng(visRows(r))
+        wsSnap.Rows(r).RowHeight = wsSrc.Rows(sr).RowHeight
+    Next r
+
+    ' 4) 表示セルの元位置→出力位置マップを作成
+    Set rowMap = BuildIndexMap(visRows)
+    Set colMap = BuildIndexMap(visCols)
+
+    ' 5) 表示範囲内で完結する結合セルだけを再現
+    RebuildVisibleMergedAreas wsSnap, srcRange, rowMap, colMap
+
+    ' 6) 印刷設定を引き継ぎ（表示セルの詰め結果に合わせてPrintAreaを設定）
+    CopyPageSetup wsSrc, wsSnap
+    wsSnap.PageSetup.PrintArea = dstRange.Address
+
+SafeExit:
+    On Error Resume Next
+    Application.EnableEvents = eventsBefore
+    Application.ScreenUpdating = screenBefore
+    Application.DisplayAlerts = alertsBefore
+    Application.Calculation = calcBefore
+    On Error GoTo 0
+    Exit Sub
+
+EH:
+    MsgBox "スナップショット作成中にエラーが発生しました: " & Err.Description, vbExclamation
+    Resume SafeExit
+End Sub
+
+'--- UsedRange内で表示されている行番号を収集
+Private Function CollectVisibleRowNumbers(ByVal ws As Worksheet, ByVal srcRange As Range) As Collection
+    Dim rowsCol As Collection
+    Dim r As Long
+    Dim rowStart As Long, rowEnd As Long
+
+    Set rowsCol = New Collection
+    rowStart = srcRange.Row
+    rowEnd = srcRange.Row + srcRange.Rows.Count - 1
+
+    For r = rowStart To rowEnd
+        If Not ws.Rows(r).Hidden Then rowsCol.Add r
+    Next r
+
+    Set CollectVisibleRowNumbers = rowsCol
+End Function
+
+'--- UsedRange内で表示されている列番号を収集
+Private Function CollectVisibleColumnNumbers(ByVal ws As Worksheet, ByVal srcRange As Range) As Collection
+    Dim colsCol As Collection
+    Dim c As Long
+    Dim colStart As Long, colEnd As Long
+
+    Set colsCol = New Collection
+    colStart = srcRange.Column
+    colEnd = srcRange.Column + srcRange.Columns.Count - 1
+
+    For c = colStart To colEnd
+        If Not ws.Columns(c).Hidden Then colsCol.Add c
+    Next c
+
+    Set CollectVisibleColumnNumbers = colsCol
+End Function
+
+'--- 元の行/列番号 -> 出力先の連番（1始まり）マップを作成
+Private Function BuildIndexMap(ByVal idxList As Collection) As Object
+    Dim d As Object, i As Long
+    Set d = CreateObject("Scripting.Dictionary")
+
+    For i = 1 To idxList.Count
+        d(CStr(idxList(i))) = i
+    Next i
+
+    Set BuildIndexMap = d
+End Function
+
+'--- 表示されているセルだけの書式を転記（PasteSpecial不使用）
+Private Sub CopyVisibleFormats(ByVal wsSrc As Worksheet, ByVal wsSnap As Worksheet, ByVal visRows As Collection, ByVal visCols As Collection)
+    Dim r As Long, c As Long
+    Dim sr As Long, sc As Long
+    Dim srcCell As Range, dstCell As Range
+    Dim b As Variant
+    Dim borderIds As Variant
+
+    borderIds = Array(xlEdgeLeft, xlEdgeTop, xlEdgeBottom, xlEdgeRight, xlInsideVertical, xlInsideHorizontal)
+
+    For r = 1 To visRows.Count
+        sr = CLng(visRows(r))
+        For c = 1 To visCols.Count
+            sc = CLng(visCols(c))
+            Set srcCell = wsSrc.Cells(sr, sc)
+            Set dstCell = wsSnap.Cells(r, c)
+
+            With dstCell
+                .NumberFormatLocal = srcCell.NumberFormatLocal
+                .HorizontalAlignment = srcCell.HorizontalAlignment
+                .VerticalAlignment = srcCell.VerticalAlignment
+                .WrapText = srcCell.WrapText
+                .Orientation = srcCell.Orientation
+                .AddIndent = srcCell.AddIndent
+                .IndentLevel = srcCell.IndentLevel
+                .ShrinkToFit = srcCell.ShrinkToFit
+                .ReadingOrder = srcCell.ReadingOrder
+            End With
+
+            With dstCell.Font
+                .Name = srcCell.Font.Name
+                .Size = srcCell.Font.Size
+                .Bold = srcCell.Font.Bold
+                .Italic = srcCell.Font.Italic
+                .Underline = srcCell.Font.Underline
+                .Color = srcCell.Font.Color
+            End With
+
+            With dstCell.Interior
+                .Pattern = srcCell.Interior.Pattern
+                .PatternColorIndex = srcCell.Interior.PatternColorIndex
+                .Color = srcCell.Interior.Color
+                .TintAndShade = srcCell.Interior.TintAndShade
+                .PatternTintAndShade = srcCell.Interior.PatternTintAndShade
+            End With
+
+            For Each b In borderIds
+                With dstCell.Borders(b)
+                    .LineStyle = srcCell.Borders(b).LineStyle
+                    .Weight = srcCell.Borders(b).Weight
+                    .Color = srcCell.Borders(b).Color
+                    .TintAndShade = srcCell.Borders(b).TintAndShade
+                End With
+            Next b
+        Next c
+    Next r
+End Sub
+
+'--- 表示範囲内で完結するMergeAreaのみを出力先で再構築
+Private Sub RebuildVisibleMergedAreas(ByVal wsSnap As Worksheet, ByVal srcRange As Range, ByVal rowMap As Object, ByVal colMap As Object)
+    Dim c As Range, ma As Range, dstMA As Range
+    Dim seen As Object
+    Dim key As String
+    Dim r As Long, cc As Long
+    Dim okRows As Boolean, okCols As Boolean
+    Dim topDst As Long, leftDst As Long
+
+    Set seen = CreateObject("Scripting.Dictionary")
+
+    For Each c In srcRange.Cells
+        If c.MergeCells Then
+            Set ma = c.MergeArea
+            key = ma.Address(False, False)
+
+            If Not seen.Exists(key) Then
+                seen.Add key, True
+
+                ' MergeAreaが表示行・表示列のみで完結している場合だけ再現
+                okRows = True
+                For r = ma.Row To ma.Row + ma.Rows.Count - 1
+                    If Not rowMap.Exists(CStr(r)) Then
+                        okRows = False
+                        Exit For
+                    End If
+                Next r
+
+                okCols = True
+                For cc = ma.Column To ma.Column + ma.Columns.Count - 1
+                    If Not colMap.Exists(CStr(cc)) Then
+                        okCols = False
+                        Exit For
+                    End If
+                Next cc
+
+                If okRows And okCols Then
+                    topDst = CLng(rowMap(CStr(ma.Row)))
+                    leftDst = CLng(colMap(CStr(ma.Column)))
+                    Set dstMA = wsSnap.Cells(topDst, leftDst).Resize(ma.Rows.Count, ma.Columns.Count)
+                    dstMA.Merge
+                End If
+            End If
+        End If
+    Next c
+End Sub
+
+'--- PDF出力を「スナップショット」対象で実行
+Public Sub ExportSnapshotToPdf(ByVal pdfPath As String)
+    Dim wsSnap As Worksheet
+    On Error GoTo EH
+
+    RefreshSnapshotFromTable
+    Set wsSnap = ThisWorkbook.Worksheets("スナップショット")
+
+    wsSnap.ExportAsFixedFormat Type:=xlTypePDF, _
+                               fileName:=pdfPath, _
+                               Quality:=xlQualityStandard, _
+                               IncludeDocProperties:=True, _
+                               IgnorePrintAreas:=False, _
+                               OpenAfterPublish:=False
+    Exit Sub
+EH:
+    MsgBox "PDF出力に失敗しました: " & Err.Description, vbExclamation
+End Sub
+
+'--- Excel出力を「スナップショット」対象で実行（単一シートの新規ブック保存）
+Public Sub ExportSnapshotToExcel(ByVal xlsxPath As String)
+    Dim wsSnap As Worksheet
+    Dim wbOut As Workbook
+    On Error GoTo EH
+
+    RefreshSnapshotFromTable
+    Set wsSnap = ThisWorkbook.Worksheets("スナップショット")
+
+    Set wbOut = Workbooks.Add(xlWBATWorksheet)
+    wsSnap.Copy Before:=wbOut.Worksheets(1)
+    Application.DisplayAlerts = False
+    wbOut.Worksheets(wbOut.Worksheets.Count).Delete
+    Application.DisplayAlerts = True
+
+    wbOut.SaveAs fileName:=xlsxPath, FileFormat:=xlOpenXMLWorkbook
+    wbOut.Close SaveChanges:=False
+    Exit Sub
+EH:
+    On Error Resume Next
+    Application.DisplayAlerts = True
+    If Not wbOut Is Nothing Then wbOut.Close SaveChanges:=False
+    On Error GoTo 0
+    MsgBox "Excel出力に失敗しました: " & Err.Description, vbExclamation
+End Sub
+
+'--- 印刷設定の主要項目をコピー
+Private Sub CopyPageSetup(ByVal wsFrom As Worksheet, ByVal wsTo As Worksheet)
+    With wsTo.PageSetup
+        .PrintArea = wsFrom.PageSetup.PrintArea
+        .PrintTitleRows = wsFrom.PageSetup.PrintTitleRows
+        .PrintTitleColumns = wsFrom.PageSetup.PrintTitleColumns
+        .Orientation = wsFrom.PageSetup.Orientation
+        .PaperSize = wsFrom.PageSetup.PaperSize
+        .Zoom = wsFrom.PageSetup.Zoom
+        .FitToPagesWide = wsFrom.PageSetup.FitToPagesWide
+        .FitToPagesTall = wsFrom.PageSetup.FitToPagesTall
+        .LeftMargin = wsFrom.PageSetup.LeftMargin
+        .RightMargin = wsFrom.PageSetup.RightMargin
+        .TopMargin = wsFrom.PageSetup.TopMargin
+        .BottomMargin = wsFrom.PageSetup.BottomMargin
+        .HeaderMargin = wsFrom.PageSetup.HeaderMargin
+        .FooterMargin = wsFrom.PageSetup.FooterMargin
+        .CenterHorizontally = wsFrom.PageSetup.CenterHorizontally
+        .CenterVertically = wsFrom.PageSetup.CenterVertically
+    End With
+End Sub
+
 '========== ユーティリティ ==========
 Private Sub Mk(p As String)
     If Len(Dir(p, vbDirectory)) = 0 Then MkDir p

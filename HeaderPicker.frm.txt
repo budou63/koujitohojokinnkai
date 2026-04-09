@@ -279,6 +279,27 @@ Private Sub CommandButton6_Click()
     Call 工事CSV出力
 End Sub
 
+' スナップショットボタン（Caption: スナップショット）
+Private Sub cmdSnapshot_Click()
+    On Error GoTo EH
+
+    Me.Enabled = False
+    DoEvents
+
+    ' 標準モジュールの既存処理を呼び出す
+    Call RefreshSnapshotFromTable
+
+    MsgBox "スナップショット出力が完了しました。", vbInformation
+
+SafeExit:
+    Me.Enabled = True
+    Exit Sub
+
+EH:
+    MsgBox "スナップショット出力でエラーが発生しました: " & Err.Description, vbExclamation
+    Resume SafeExit
+End Sub
+
 
 Private Sub UserForm_Initialize()
     ' サイズ固定したいならここで指定（任意）
@@ -584,5 +605,3 @@ Private Function GetColByHeaderLocal(ByVal ws As Worksheet, ByVal headerName As 
     Next
     GetColByHeaderLocal = 0
 End Function
-
-
