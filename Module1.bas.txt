@@ -970,7 +970,9 @@ Private Function IsKoujiCompletedCell(ByVal targetCell As Range) As Boolean
 End Function
 
 
-Public Sub 予算CSV取込()
+Public Sub 予算CSV取込_追記()
+
+    Const CSV_HEADER_ROW As Long = 8
 
     Dim wsDest As Worksheet
     Dim wbCsv As Workbook
@@ -978,6 +980,8 @@ Public Sub 予算CSV取込()
     Dim srcRange As Range
     Dim fd As FileDialog
     Dim csvPath As String
+    Dim srcLastRow As Long, srcLastCol As Long
+    Dim appendStartRow As Long
     Dim importRows As Long, importCols As Long
     Dim calcMode As XlCalculation
     Dim screenUpdatingBefore As Boolean
@@ -1009,38 +1013,65 @@ Public Sub 予算CSV取込()
 
     Set wbCsv = Workbooks.Open(Filename:=csvPath, Local:=True)
     Set wsCsv = wbCsv.Worksheets(1)
-    Set srcRange = wsCsv.UsedRange
+
+    srcLastRow = GetSheetLastUsedRow(wsCsv)
+    srcLastCol = GetSheetLastUsedCol(wsCsv)
+
+    If srcLastCol = 0 Or srcLastRow < CSV_HEADER_ROW Then
+        MsgBox "CSVに取込対象（8行目以降）がありません。", vbExclamation
+        GoTo FinallyExit
+    End If
+
+    Set srcRange = wsCsv.Range(wsCsv.Cells(CSV_HEADER_ROW, 1), wsCsv.Cells(srcLastRow, srcLastCol))
+    appendStartRow = GetSheetLastUsedRow(wsDest)
+    If appendStartRow = 1 And GetSheetLastUsedCol(wsDest) = 0 Then
+        appendStartRow = 1
+    Else
+        appendStartRow = appendStartRow + 1
+    End If
 
     importRows = srcRange.Rows.Count
     importCols = srcRange.Columns.Count
 
-    wsDest.Cells.Clear
-    srcRange.Copy Destination:=wsDest.Range("A1")
+    srcRange.Copy Destination:=wsDest.Cells(appendStartRow, 1)
     Application.CutCopyMode = False
 
-    wbCsv.Close SaveChanges:=False
-    Set wbCsv = Nothing
-
-    MsgBox "CSV取込が完了しました。" & vbCrLf & _
+    MsgBox "CSV追記が完了しました。" & vbCrLf & _
+           "追記開始行: " & appendStartRow & vbCrLf & _
            "行数: " & importRows & vbCrLf & _
            "列数: " & importCols & vbCrLf & _
            "取込先: " & wsDest.Name, vbInformation
 
 FinallyExit:
+    On Error Resume Next
+    If Not wbCsv Is Nothing Then wbCsv.Close SaveChanges:=False
+    On Error GoTo 0
     Application.ScreenUpdating = screenUpdatingBefore
     Application.EnableEvents = enableEventsBefore
     Application.Calculation = calcMode
     Exit Sub
 
 ErrHandler:
-    errMsg = "予算CSVの取込でエラーが発生しました。" & vbCrLf & _
+    errMsg = "予算CSVの追記取込でエラーが発生しました。" & vbCrLf & _
              "詳細: " & Err.Description
-    On Error Resume Next
-    If Not wbCsv Is Nothing Then wbCsv.Close SaveChanges:=False
-    On Error GoTo 0
     MsgBox errMsg, vbExclamation
     Resume FinallyExit
 End Sub
+
+Private Function GetSheetLastUsedCol(ByVal ws As Worksheet) As Long
+    Dim lastCell As Range
+
+    On Error Resume Next
+    Set lastCell = ws.Cells.Find(What:="*", After:=ws.Cells(1, 1), LookIn:=xlFormulas, _
+                                 LookAt:=xlPart, SearchOrder:=xlByColumns, SearchDirection:=xlPrevious)
+    On Error GoTo 0
+
+    If lastCell Is Nothing Then
+        GetSheetLastUsedCol = 0
+    Else
+        GetSheetLastUsedCol = lastCell.Column
+    End If
+End Function
 
 
 Sub 科目別事業別歳出一覧編集()
