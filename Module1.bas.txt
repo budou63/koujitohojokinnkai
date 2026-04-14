@@ -972,7 +972,7 @@ End Function
 
 Public Sub 予算CSV取込_追記()
 
-    Const CSV_HEADER_ROW As Long = 8
+    Const CSV_DATA_START_ROW As Long = 9
 
     Dim wsDest As Worksheet
     Dim wbCsv As Workbook
@@ -987,6 +987,7 @@ Public Sub 予算CSV取込_追記()
     Dim screenUpdatingBefore As Boolean
     Dim enableEventsBefore As Boolean
     Dim errMsg As String
+    Dim lastCellDest As Range
 
     On Error GoTo ErrHandler
 
@@ -1017,17 +1018,21 @@ Public Sub 予算CSV取込_追記()
     srcLastRow = GetSheetLastUsedRow(wsCsv)
     srcLastCol = GetSheetLastUsedCol(wsCsv)
 
-    If srcLastCol = 0 Or srcLastRow < CSV_HEADER_ROW Then
-        MsgBox "CSVに取込対象（8行目以降）がありません。", vbExclamation
+    If srcLastCol = 0 Or srcLastRow < CSV_DATA_START_ROW Then
+        MsgBox "CSVに取込対象（9行目以降）がありません。", vbExclamation
         GoTo FinallyExit
     End If
 
-    Set srcRange = wsCsv.Range(wsCsv.Cells(CSV_HEADER_ROW, 1), wsCsv.Cells(srcLastRow, srcLastCol))
-    appendStartRow = GetSheetLastUsedRow(wsDest)
-    If appendStartRow = 1 And GetSheetLastUsedCol(wsDest) = 0 Then
+    Set srcRange = wsCsv.Range(wsCsv.Cells(CSV_DATA_START_ROW, 1), wsCsv.Cells(srcLastRow, srcLastCol))
+
+    On Error Resume Next
+    Set lastCellDest = wsDest.Cells.Find(What:="*", After:=wsDest.Cells(1, 1), LookIn:=xlFormulas, _
+                                         LookAt:=xlPart, SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
+    On Error GoTo ErrHandler
+    If lastCellDest Is Nothing Then
         appendStartRow = 1
     Else
-        appendStartRow = appendStartRow + 1
+        appendStartRow = lastCellDest.Row + 1
     End If
 
     importRows = srcRange.Rows.Count
