@@ -970,6 +970,78 @@ Private Function IsKoujiCompletedCell(ByVal targetCell As Range) As Boolean
 End Function
 
 
+Public Sub 予算CSV取込()
+
+    Dim wsDest As Worksheet
+    Dim wbCsv As Workbook
+    Dim wsCsv As Worksheet
+    Dim srcRange As Range
+    Dim fd As FileDialog
+    Dim csvPath As String
+    Dim importRows As Long, importCols As Long
+    Dim calcMode As XlCalculation
+    Dim screenUpdatingBefore As Boolean
+    Dim enableEventsBefore As Boolean
+    Dim errMsg As String
+
+    On Error GoTo ErrHandler
+
+    Set fd = Application.FileDialog(msoFileDialogFilePicker)
+    With fd
+        .Title = "予算CSVを選択してください"
+        .AllowMultiSelect = False
+        .Filters.Clear
+        .Filters.Add "CSVファイル", "*.csv"
+        .Filters.Add "すべてのファイル", "*.*"
+        If .Show <> -1 Then Exit Sub   ' キャンセル時は何もしない
+        csvPath = .SelectedItems(1)
+    End With
+
+    Set wsDest = ThisWorkbook.Worksheets("予算（コピペ）")
+
+    screenUpdatingBefore = Application.ScreenUpdating
+    enableEventsBefore = Application.EnableEvents
+    calcMode = Application.Calculation
+
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+
+    Set wbCsv = Workbooks.Open(Filename:=csvPath, Local:=True)
+    Set wsCsv = wbCsv.Worksheets(1)
+    Set srcRange = wsCsv.UsedRange
+
+    importRows = srcRange.Rows.Count
+    importCols = srcRange.Columns.Count
+
+    wsDest.Cells.Clear
+    srcRange.Copy Destination:=wsDest.Range("A1")
+    Application.CutCopyMode = False
+
+    wbCsv.Close SaveChanges:=False
+    Set wbCsv = Nothing
+
+    MsgBox "CSV取込が完了しました。" & vbCrLf & _
+           "行数: " & importRows & vbCrLf & _
+           "列数: " & importCols & vbCrLf & _
+           "取込先: " & wsDest.Name, vbInformation
+
+FinallyExit:
+    Application.ScreenUpdating = screenUpdatingBefore
+    Application.EnableEvents = enableEventsBefore
+    Application.Calculation = calcMode
+    Exit Sub
+
+ErrHandler:
+    errMsg = "予算CSVの取込でエラーが発生しました。" & vbCrLf & _
+             "詳細: " & Err.Description
+    On Error Resume Next
+    If Not wbCsv Is Nothing Then wbCsv.Close SaveChanges:=False
+    On Error GoTo 0
+    MsgBox errMsg, vbExclamation
+    Resume FinallyExit
+End Sub
+
 
 Sub 科目別事業別歳出一覧編集()
 
