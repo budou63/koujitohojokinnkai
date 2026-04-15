@@ -279,6 +279,11 @@ Private Sub CommandButton6_Click()
     Call 工事CSV出力
 End Sub
 
+Private Sub CommandButton8_Click()
+    ' 標準モジュールのマクロを呼び出す
+    Call 予算CSV取込_追記
+End Sub
+
 ' スナップショットボタン（Caption: スナップショット）
 Private Sub CommandButton7_Click()
     On Error GoTo EH
@@ -605,4 +610,3 @@ Private Function GetColByHeaderLocal(ByVal ws As Worksheet, ByVal headerName As 
     Next
     GetColByHeaderLocal = 0
 End Function
-

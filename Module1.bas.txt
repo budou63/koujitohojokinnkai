@@ -970,72 +970,200 @@ Private Function IsKoujiCompletedCell(ByVal targetCell As Range) As Boolean
 End Function
 
 
+Public Sub 予算CSV取込_追記()
+
+    Const CSV_DATA_START_ROW As Long = 9
+
+    Dim wsDest As Worksheet
+    Dim wbCsv As Workbook
+    Dim wsCsv As Worksheet
+    Dim srcRange As Range
+    Dim fd As FileDialog
+    Dim csvPath As String
+    Dim srcLastRow As Long, srcLastCol As Long
+    Dim appendStartRow As Long
+    Dim importRows As Long, importCols As Long
+    Dim calcMode As XlCalculation
+    Dim screenUpdatingBefore As Boolean
+    Dim enableEventsBefore As Boolean
+    Dim errMsg As String
+    Dim lastCellDest As Range
+
+    On Error GoTo ErrHandler
+
+    Set fd = Application.FileDialog(msoFileDialogFilePicker)
+    With fd
+        .Title = "予算CSVを選択してください"
+        .AllowMultiSelect = False
+        .Filters.Clear
+        .Filters.Add "CSVファイル", "*.csv"
+        .Filters.Add "すべてのファイル", "*.*"
+        If .Show <> -1 Then Exit Sub   ' キャンセル時は何もしない
+        csvPath = .SelectedItems(1)
+    End With
+
+    Set wsDest = ThisWorkbook.Worksheets("予算（コピペ）")
+
+    screenUpdatingBefore = Application.ScreenUpdating
+    enableEventsBefore = Application.EnableEvents
+    calcMode = Application.Calculation
+
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+
+    Set wbCsv = Workbooks.Open(Filename:=csvPath, Local:=True)
+    Set wsCsv = wbCsv.Worksheets(1)
+
+    srcLastRow = GetSheetLastUsedRow(wsCsv)
+    srcLastCol = GetSheetLastUsedCol(wsCsv)
+
+    If srcLastCol = 0 Or srcLastRow < CSV_DATA_START_ROW Then
+        MsgBox "CSVに取込対象（9行目以降）がありません。", vbExclamation
+        GoTo FinallyExit
+    End If
+
+    Set srcRange = wsCsv.Range(wsCsv.Cells(CSV_DATA_START_ROW, 1), wsCsv.Cells(srcLastRow, srcLastCol))
+
+    On Error Resume Next
+    Set lastCellDest = wsDest.Cells.Find(What:="*", After:=wsDest.Cells(1, 1), LookIn:=xlFormulas, _
+                                         LookAt:=xlPart, SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
+    On Error GoTo ErrHandler
+    If lastCellDest Is Nothing Then
+        appendStartRow = 1
+    Else
+        appendStartRow = lastCellDest.Row + 1
+    End If
+
+    importRows = srcRange.Rows.Count
+    importCols = srcRange.Columns.Count
+
+    srcRange.Copy Destination:=wsDest.Cells(appendStartRow, 1)
+    Application.CutCopyMode = False
+
+    MsgBox "CSV追記が完了しました。" & vbCrLf & _
+           "追記開始行: " & appendStartRow & vbCrLf & _
+           "行数: " & importRows & vbCrLf & _
+           "列数: " & importCols & vbCrLf & _
+           "取込先: " & wsDest.Name, vbInformation
+
+FinallyExit:
+    On Error Resume Next
+    If Not wbCsv Is Nothing Then wbCsv.Close SaveChanges:=False
+    On Error GoTo 0
+    Application.ScreenUpdating = screenUpdatingBefore
+    Application.EnableEvents = enableEventsBefore
+    Application.Calculation = calcMode
+    Exit Sub
+
+ErrHandler:
+    errMsg = "予算CSVの追記取込でエラーが発生しました。" & vbCrLf & _
+             "詳細: " & Err.Description
+    MsgBox errMsg, vbExclamation
+    Resume FinallyExit
+End Sub
+
+Private Function GetSheetLastUsedCol(ByVal ws As Worksheet) As Long
+    Dim lastCell As Range
+
+    On Error Resume Next
+    Set lastCell = ws.Cells.Find(What:="*", After:=ws.Cells(1, 1), LookIn:=xlFormulas, _
+                                 LookAt:=xlPart, SearchOrder:=xlByColumns, SearchDirection:=xlPrevious)
+    On Error GoTo 0
+
+    If lastCell Is Nothing Then
+        GetSheetLastUsedCol = 0
+    Else
+        GetSheetLastUsedCol = lastCell.Column
+    End If
+End Function
+
 
 Sub 科目別事業別歳出一覧編集()
 
     Dim wsSrc As Worksheet, wsDest As Worksheet
-    Dim lastRow As Long, lastCol As Long
+    Dim lastRowSrc As Long, lastColSrc As Long
+    Dim lastRowDest As Long
+    Dim startRowSrc As Long
+    Dim startRowDest As Long
     Dim r As Long, c As Long
     Dim value As Variant
-    Dim yearNum As Integer
     Dim yearStr As String, majorName As String, detailName As String
-    Dim destRow As Long
     Dim isKurikoshi As Boolean
+    Dim appendedCount As Long
+    Dim prevProcessedRow As Long
+    Dim calcMode As XlCalculation
+    Dim screenUpdatingBefore As Boolean
+    Dim enableEventsBefore As Boolean
+    Dim errMsg As String
 
-    Set wsSrc = ThisWorkbook.Sheets("予算（コピペ）")
-    Set wsDest = ThisWorkbook.Sheets("予算（ソート後）")
+    On Error GoTo ErrHandler
 
-    ' 転写先クリア（1～2行目は保持）
-    wsDest.Rows("3:" & wsDest.Rows.Count).ClearContents
+    Set wsSrc = ThisWorkbook.Worksheets("予算（コピペ）")
+    Set wsDest = ThisWorkbook.Worksheets("予算（ソート後）")
+
+    screenUpdatingBefore = Application.ScreenUpdating
+    enableEventsBefore = Application.EnableEvents
+    calcMode = Application.Calculation
+
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+
+    lastRowSrc = GetSheetLastUsedRow(wsSrc)
+    lastColSrc = GetSheetLastUsedCol(wsSrc)
+    If lastColSrc = 0 Then
+        MsgBox "予算（コピペ）に処理対象データがありません。", vbInformation
+        GoTo FinallyExit
+    End If
+
+    prevProcessedRow = GetBudgetEditLastProcessedRow()
+    If prevProcessedRow < 1 Then
+        startRowSrc = 1
+    Else
+        startRowSrc = prevProcessedRow + 1
+    End If
+
+    If startRowSrc > lastRowSrc Then
+        MsgBox "未処理データはありません。", vbInformation
+        GoTo FinallyExit
+    End If
+
+    lastRowDest = GetSheetLastUsedRow(wsDest)
+    If lastRowDest < 3 Or GetSheetLastUsedCol(wsDest) = 0 Then
+        startRowDest = 3
+    Else
+        startRowDest = lastRowDest + 1
+    End If
+
     wsDest.Cells.EntireColumn.Hidden = False
 
-    ' 最終行と列
-    lastRow = wsSrc.Cells(wsSrc.Rows.Count, 1).End(xlUp).row
-    lastCol = wsSrc.Cells(2, wsSrc.Columns.Count).End(xlToLeft).Column
-
-    ' データ転写（3行目以降 → 3行目以降）
-    For r = 3 To lastRow
-        destRow = r
+    For r = startRowSrc To lastRowSrc
         yearStr = ""
         majorName = ""
         detailName = ""
 
-        ' C列が「繰越明許」のとき年度を -1
-        isKurikoshi = (wsSrc.Cells(r, 3).value = "繰越明許")
+        isKurikoshi = (CStr(wsSrc.Cells(r, 3).Value) = "繰越明許")
 
-        For c = 1 To lastCol
-            value = wsSrc.Cells(r, c).value
+        For c = 1 To lastColSrc
+            value = wsSrc.Cells(r, c).Value
 
-            ' A列：年度補正＋元号変換
             If c = 1 Then
-                If IsNumeric(value) Then
-                    yearNum = CInt(value)
-                    If isKurikoshi Then yearNum = yearNum - 1
-
-                    If yearNum >= 2019 Then
-                        value = "R" & (yearNum - 2018)
-                    ElseIf yearNum >= 1989 Then
-                        value = "H" & (yearNum - 1988)
-                    ElseIf yearNum >= 1926 Then
-                        value = "S" & (yearNum - 1925)
-                    End If
-                End If
-                yearStr = value ' ←変換後を記録
+                value = ConvertBudgetYearToWareki(value, isKurikoshi)
+                yearStr = CStr(value)
             End If
 
-            ' 合体対象列保存（25=Y列:大事業、30=AD列:細々節）
             If c = 25 Then majorName = value
             If c = 30 Then detailName = value
 
-            ' 転写（1列右ずらし＝B列以降）
-            wsDest.Cells(destRow, c + 1).value = value
+            wsDest.Cells(startRowDest, c + 1).Value = value
         Next c
 
-        ' A列に結合キー（空白なし）
-        wsDest.Cells(destRow, 1).value = yearStr & majorName & detailName
+        wsDest.Cells(startRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorName, detailName)
+        startRowDest = startRowDest + 1
+        appendedCount = appendedCount + 1
     Next r
 
-    ' 非表示にする列（元の列番号に+1してB列以降に適用）
     Dim hideCols As Variant
     hideCols = Array(2, 4, 5, 6, 7, 8, _
                      10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, _
@@ -1046,9 +1174,106 @@ Sub 科目別事業別歳出一覧編集()
         wsDest.Columns(i + 1).Hidden = True
     Next i
 
-    MsgBox "繰越明許対応の転写が完了しました。", vbInformation
+    If appendedCount = 0 Then
+        MsgBox "未処理データはありません。", vbInformation
+    Else
+        SetBudgetEditLastProcessedRow lastRowSrc
+        MsgBox "未処理データの転写が完了しました。" & vbCrLf & _
+               "追加件数: " & appendedCount & vbCrLf & _
+               "処理元行: " & startRowSrc & "～" & lastRowSrc, vbInformation
+    End If
+
+FinallyExit:
+    Application.ScreenUpdating = screenUpdatingBefore
+    Application.EnableEvents = enableEventsBefore
+    Application.Calculation = calcMode
+    Exit Sub
+
+ErrHandler:
+    errMsg = "科目別事業別歳出一覧編集でエラーが発生しました。" & vbCrLf & _
+             "詳細: " & Err.Description
+    MsgBox errMsg, vbExclamation
+    Resume FinallyExit
 
 End Sub
+
+Private Function ConvertBudgetYearToWareki(ByVal srcValue As Variant, ByVal isKurikoshi As Boolean) As Variant
+    Dim yearNum As Long
+
+    ConvertBudgetYearToWareki = srcValue
+
+    If Not IsNumeric(srcValue) Then Exit Function
+
+    yearNum = CLng(srcValue)
+    If isKurikoshi Then yearNum = yearNum - 1
+
+    If yearNum >= 2019 Then
+        ConvertBudgetYearToWareki = "R" & (yearNum - 2018)
+    ElseIf yearNum >= 1989 Then
+        ConvertBudgetYearToWareki = "H" & (yearNum - 1988)
+    ElseIf yearNum >= 1926 Then
+        ConvertBudgetYearToWareki = "S" & (yearNum - 1925)
+    End If
+End Function
+
+Private Function BuildBudgetSortKey(ByVal yearStr As String, ByVal majorName As String, ByVal detailName As String) As String
+    BuildBudgetSortKey = CStr(yearStr) & CStr(majorName) & CStr(detailName)
+End Function
+
+Private Function GetBudgetEditLastProcessedRow() As Long
+    Dim wsCtl As Worksheet
+    Dim hit As Range
+
+    Set wsCtl = EnsureBudgetEditControlSheet()
+    Set hit = wsCtl.Columns(1).Find(What:="科目別事業別歳出一覧編集_最終処理行", _
+                                    After:=wsCtl.Cells(1, 1), LookIn:=xlValues, LookAt:=xlWhole, _
+                                    SearchOrder:=xlByRows, SearchDirection:=xlNext)
+    If hit Is Nothing Then
+        GetBudgetEditLastProcessedRow = 0
+    ElseIf IsNumeric(hit.Offset(0, 1).Value) Then
+        GetBudgetEditLastProcessedRow = CLng(hit.Offset(0, 1).Value)
+    Else
+        GetBudgetEditLastProcessedRow = 0
+    End If
+End Function
+
+Private Sub SetBudgetEditLastProcessedRow(ByVal rowNo As Long)
+    Dim wsCtl As Worksheet
+    Dim hit As Range
+    Dim nextRow As Long
+
+    Set wsCtl = EnsureBudgetEditControlSheet()
+    Set hit = wsCtl.Columns(1).Find(What:="科目別事業別歳出一覧編集_最終処理行", _
+                                    After:=wsCtl.Cells(1, 1), LookIn:=xlValues, LookAt:=xlWhole, _
+                                    SearchOrder:=xlByRows, SearchDirection:=xlNext)
+    If hit Is Nothing Then
+        nextRow = wsCtl.Cells(wsCtl.Rows.Count, 1).End(xlUp).Row + 1
+        If nextRow < 1 Then nextRow = 1
+        wsCtl.Cells(nextRow, 1).Value = "科目別事業別歳出一覧編集_最終処理行"
+        wsCtl.Cells(nextRow, 2).Value = rowNo
+    Else
+        hit.Offset(0, 1).Value = rowNo
+    End If
+End Sub
+
+Private Function EnsureBudgetEditControlSheet() As Worksheet
+    Const CONTROL_SHEET_NAME As String = "予算取込管理"
+    Dim ws As Worksheet
+
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(CONTROL_SHEET_NAME)
+    On Error GoTo 0
+
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+        ws.Name = CONTROL_SHEET_NAME
+        ws.Cells(1, 1).Value = "キー"
+        ws.Cells(1, 2).Value = "値"
+    End If
+
+    ws.Visible = xlSheetVeryHidden
+    Set EnsureBudgetEditControlSheet = ws
+End Function
 
 
 
