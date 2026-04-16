@@ -1081,14 +1081,19 @@ End Function
 
 Sub 科目別事業別歳出一覧編集()
 
+    Const SRC_HEADER_ROW As Long = 2
+    Const SRC_DATA_START_ROW As Long = 3
+
     Dim wsSrc As Worksheet, wsDest As Worksheet
     Dim lastRowSrc As Long, lastColSrc As Long
-    Dim appendRowDest As Long
+    Dim appendRowDest As Long, appendStartRow As Long
+    Dim colYear As Long, colBudgetTypeName As Long
+    Dim colMajorName As Long, colDetailName As Long
     Dim r As Long, c As Long
     Dim value As Variant
     Dim yearStr As String
-    Dim majorCode As String
-    Dim detailCode As String
+    Dim majorName As String
+    Dim detailName As String
     Dim isKurikoshi As Boolean
     Dim appendedCount As Long
     Dim calcMode As XlCalculation
@@ -1111,39 +1116,50 @@ Sub 科目別事業別歳出一覧編集()
 
     lastRowSrc = GetSheetLastUsedRow(wsSrc)
     lastColSrc = GetSheetLastUsedCol(wsSrc)
-    If lastColSrc = 0 Or lastRowSrc = 0 Then
+    If lastColSrc = 0 Or lastRowSrc < SRC_DATA_START_ROW Then
         MsgBox "予算（コピペ）に処理対象データがありません。", vbInformation
         GoTo FinallyExit
     End If
 
+    colYear = GetColByHeaderAny(wsSrc, SRC_HEADER_ROW, Array("年度"))
+    colBudgetTypeName = GetColByHeaderAny(wsSrc, SRC_HEADER_ROW, Array("予算区分名称"))
+    colMajorName = GetColByHeaderAny(wsSrc, SRC_HEADER_ROW, Array("大事業名称"))
+    colDetailName = GetColByHeaderAny(wsSrc, SRC_HEADER_ROW, Array("細々節名称"))
+
+    If colYear * colBudgetTypeName * colMajorName * colDetailName = 0 Then
+        Err.Raise vbObjectError + 3100, , "必要な見出し（年度/予算区分名称/大事業名称/細々節名称）が見つかりません。"
+    End If
+
     appendRowDest = GetBudgetSortAppendStartRow(wsDest)
+    appendStartRow = appendRowDest
 
     ' 既存運用に合わせ、必要列の非表示状態を維持
     wsDest.Cells.EntireColumn.Hidden = False
 
-    For r = 1 To lastRowSrc
+    For r = SRC_DATA_START_ROW To lastRowSrc
         If Not IsTargetBudgetRow(wsSrc.Cells(r, 1)) Then GoTo ContinueRow
 
         yearStr = ""
         majorCode = ""
         detailCode = ""
 
-        isKurikoshi = (CStr(wsSrc.Cells(r, 3).Value) = "繰越明許")
+        isKurikoshi = (CStr(wsSrc.Cells(r, colBudgetTypeName).Value) = "繰越明許")
 
         For c = 1 To lastColSrc
             value = wsSrc.Cells(r, c).Value
 
-            If c = 1 Then
+            If c = colYear Then
                 value = ConvertBudgetYearToWareki(value, isKurikoshi)
                 yearStr = CStr(value)
             End If
 
-            If c = 16 Then majorCode = CStr(value)  ' 大事業
-            If c = 21 Then detailCode = CStr(value) ' 細々節
+            If c = colMajorName Then majorName = CStr(value)
+            If c = colDetailName Then detailName = CStr(value)
+
             wsDest.Cells(appendRowDest, c + 1).Value = value
         Next c
 
-        wsDest.Cells(appendRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorCode, detailCode)
+        wsDest.Cells(appendRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorName, detailName)
         appendRowDest = appendRowDest + 1
         appendedCount = appendedCount + 1
 ContinueRow:
@@ -1164,7 +1180,7 @@ ContinueRow:
     Else
         MsgBox "赤字行の編集結果を末尾へ追記しました。" & vbCrLf & _
                "追加件数: " & appendedCount & vbCrLf & _
-               "追記開始行: " & GetBudgetSortAppendStartRow(wsDest) - appendedCount, vbInformation
+               "追記開始行: " & appendStartRow, vbInformation
     End If
 
 FinallyExit:
@@ -1236,9 +1252,9 @@ Private Function ConvertBudgetYearToWareki(ByVal srcValue As Variant, ByVal isKu
 End Function
 
 Private Function BuildBudgetSortKey(ByVal yearStr As String, _
-                                    ByVal majorCode As String, _
-                                    ByVal detailCode As String) As String
-    BuildBudgetSortKey = MakeKey(yearStr, majorCode, detailCode)
+                                    ByVal majorName As String, _
+                                    ByVal detailName As String) As String
+    BuildBudgetSortKey = MakeKey(yearStr, majorName, detailName)
 End Function
 
 
