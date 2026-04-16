@@ -1083,15 +1083,12 @@ Sub 科目別事業別歳出一覧編集()
 
     Dim wsSrc As Worksheet, wsDest As Worksheet
     Dim lastRowSrc As Long, lastColSrc As Long
-    Dim lastRowDest As Long
-    Dim startRowSrc As Long
     Dim startRowDest As Long
     Dim r As Long, c As Long
     Dim value As Variant
     Dim yearStr As String, majorName As String, detailName As String
     Dim isKurikoshi As Boolean
     Dim appendedCount As Long
-    Dim prevProcessedRow As Long
     Dim calcMode As XlCalculation
     Dim screenUpdatingBefore As Boolean
     Dim enableEventsBefore As Boolean
@@ -1117,28 +1114,12 @@ Sub 科目別事業別歳出一覧編集()
         GoTo FinallyExit
     End If
 
-    prevProcessedRow = GetBudgetEditLastProcessedRow()
-    If prevProcessedRow < 1 Then
-        startRowSrc = 1
-    Else
-        startRowSrc = prevProcessedRow + 1
-    End If
-
-    If startRowSrc > lastRowSrc Then
-        MsgBox "未処理データはありません。", vbInformation
-        GoTo FinallyExit
-    End If
-
-    lastRowDest = GetSheetLastUsedRow(wsDest)
-    If lastRowDest < 3 Or GetSheetLastUsedCol(wsDest) = 0 Then
-        startRowDest = 3
-    Else
-        startRowDest = lastRowDest + 1
-    End If
-
+    startRowDest = GetBudgetSortAppendStartRow(wsDest)
     wsDest.Cells.EntireColumn.Hidden = False
 
-    For r = startRowSrc To lastRowSrc
+    For r = 1 To lastRowSrc
+        If Not IsTargetBudgetRow(wsSrc, r) Then GoTo ContinueRow
+
         yearStr = ""
         majorName = ""
         detailName = ""
@@ -1160,8 +1141,10 @@ Sub 科目別事業別歳出一覧編集()
         Next c
 
         wsDest.Cells(startRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorName, detailName)
+        MarkBudgetRowProcessed wsSrc, r
         startRowDest = startRowDest + 1
         appendedCount = appendedCount + 1
+ContinueRow:
     Next r
 
     Dim hideCols As Variant
@@ -1175,12 +1158,10 @@ Sub 科目別事業別歳出一覧編集()
     Next i
 
     If appendedCount = 0 Then
-        MsgBox "未処理データはありません。", vbInformation
+        MsgBox "A列が赤字の未処理データはありません。", vbInformation
     Else
-        SetBudgetEditLastProcessedRow lastRowSrc
-        MsgBox "未処理データの転写が完了しました。" & vbCrLf & _
-               "追加件数: " & appendedCount & vbCrLf & _
-               "処理元行: " & startRowSrc & "～" & lastRowSrc, vbInformation
+        MsgBox "赤字行の転写が完了しました。" & vbCrLf & _
+               "追加件数: " & appendedCount, vbInformation
     End If
 
 FinallyExit:
@@ -1196,6 +1177,36 @@ ErrHandler:
     Resume FinallyExit
 
 End Sub
+
+Private Function IsTargetBudgetRow(ByVal wsSrc As Worksheet, ByVal rowNo As Long) As Boolean
+    Dim fontColor As Long
+
+    fontColor = wsSrc.Cells(rowNo, 1).Font.Color
+
+    ' まず RGB(255, 0, 0) を基準に判定（必要時はここに赤系条件を追加）
+    IsTargetBudgetRow = (fontColor = RGB(255, 0, 0))
+End Function
+
+Private Sub MarkBudgetRowProcessed(ByVal wsSrc As Worksheet, ByVal rowNo As Long)
+    wsSrc.Cells(rowNo, 1).Font.Color = RGB(0, 0, 0)
+End Sub
+
+Private Function GetBudgetSortAppendStartRow(ByVal wsDest As Worksheet) As Long
+    Dim lastCell As Range
+
+    On Error Resume Next
+    Set lastCell = wsDest.Cells.Find(What:="*", After:=wsDest.Cells(1, 1), LookIn:=xlFormulas, _
+                                     LookAt:=xlPart, SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
+    On Error GoTo 0
+
+    If lastCell Is Nothing Then
+        GetBudgetSortAppendStartRow = 3
+    ElseIf lastCell.Row < 3 Then
+        GetBudgetSortAppendStartRow = 3
+    Else
+        GetBudgetSortAppendStartRow = lastCell.Row + 1
+    End If
+End Function
 
 Private Function ConvertBudgetYearToWareki(ByVal srcValue As Variant, ByVal isKurikoshi As Boolean) As Variant
     Dim yearNum As Long
@@ -1218,61 +1229,6 @@ End Function
 
 Private Function BuildBudgetSortKey(ByVal yearStr As String, ByVal majorName As String, ByVal detailName As String) As String
     BuildBudgetSortKey = CStr(yearStr) & CStr(majorName) & CStr(detailName)
-End Function
-
-Private Function GetBudgetEditLastProcessedRow() As Long
-    Dim wsCtl As Worksheet
-    Dim hit As Range
-
-    Set wsCtl = EnsureBudgetEditControlSheet()
-    Set hit = wsCtl.Columns(1).Find(What:="科目別事業別歳出一覧編集_最終処理行", _
-                                    After:=wsCtl.Cells(1, 1), LookIn:=xlValues, LookAt:=xlWhole, _
-                                    SearchOrder:=xlByRows, SearchDirection:=xlNext)
-    If hit Is Nothing Then
-        GetBudgetEditLastProcessedRow = 0
-    ElseIf IsNumeric(hit.Offset(0, 1).Value) Then
-        GetBudgetEditLastProcessedRow = CLng(hit.Offset(0, 1).Value)
-    Else
-        GetBudgetEditLastProcessedRow = 0
-    End If
-End Function
-
-Private Sub SetBudgetEditLastProcessedRow(ByVal rowNo As Long)
-    Dim wsCtl As Worksheet
-    Dim hit As Range
-    Dim nextRow As Long
-
-    Set wsCtl = EnsureBudgetEditControlSheet()
-    Set hit = wsCtl.Columns(1).Find(What:="科目別事業別歳出一覧編集_最終処理行", _
-                                    After:=wsCtl.Cells(1, 1), LookIn:=xlValues, LookAt:=xlWhole, _
-                                    SearchOrder:=xlByRows, SearchDirection:=xlNext)
-    If hit Is Nothing Then
-        nextRow = wsCtl.Cells(wsCtl.Rows.Count, 1).End(xlUp).Row + 1
-        If nextRow < 1 Then nextRow = 1
-        wsCtl.Cells(nextRow, 1).Value = "科目別事業別歳出一覧編集_最終処理行"
-        wsCtl.Cells(nextRow, 2).Value = rowNo
-    Else
-        hit.Offset(0, 1).Value = rowNo
-    End If
-End Sub
-
-Private Function EnsureBudgetEditControlSheet() As Worksheet
-    Const CONTROL_SHEET_NAME As String = "予算取込管理"
-    Dim ws As Worksheet
-
-    On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets(CONTROL_SHEET_NAME)
-    On Error GoTo 0
-
-    If ws Is Nothing Then
-        Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
-        ws.Name = CONTROL_SHEET_NAME
-        ws.Cells(1, 1).Value = "キー"
-        ws.Cells(1, 2).Value = "値"
-    End If
-
-    ws.Visible = xlSheetVeryHidden
-    Set EnsureBudgetEditControlSheet = ws
 End Function
 
 
