@@ -1231,6 +1231,165 @@ Private Function BuildBudgetSortKey(ByVal yearStr As String, ByVal majorName As 
     BuildBudgetSortKey = CStr(yearStr) & CStr(majorName) & CStr(detailName)
 End Function
 
+Public Sub 手順2_新ファイル基準表を作成する()
+    Const SRC_SHEET_NAME As String = "表"
+    Const DST_SHEET_NAME As String = "新ファイル基準表"
+    Const SRC_HEADER_ROW As Long = 3
+    Const SRC_DATA_START_ROW As Long = 4
+    Const DST_HEADER_ROW As Long = 2
+    Const DST_DATA_START_ROW As Long = 3
+
+    Dim wsSrc As Worksheet, wsDst As Worksheet
+    Dim srcLastRow As Long, dstLastRow As Long
+    Dim srcColYear As Long, srcColMajor As Long, srcColDetail As Long
+    Dim dstColSerial As Long, dstColCabinet As Long, dstColKey As Long
+    Dim dstColYear As Long, dstColMajor As Long, dstColDetail As Long
+    Dim dictExists As Object
+    Dim r As Long
+    Dim key As String
+    Dim appendStartRow As Long, appendEndRow As Long
+    Dim appendedCount As Long
+    Dim calcMode As XlCalculation
+    Dim screenUpdatingBefore As Boolean
+    Dim enableEventsBefore As Boolean
+
+    On Error GoTo ErrHandler
+
+    Set wsSrc = ThisWorkbook.Worksheets(SRC_SHEET_NAME)
+    Set wsDst = ThisWorkbook.Worksheets(DST_SHEET_NAME)
+
+    screenUpdatingBefore = Application.ScreenUpdating
+    enableEventsBefore = Application.EnableEvents
+    calcMode = Application.Calculation
+
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+
+    srcColYear = GetColByHeaderAny(wsSrc, SRC_HEADER_ROW, Array("年度"))
+    srcColMajor = GetColByHeaderAny(wsSrc, SRC_HEADER_ROW, Array("大事業", "大事業名称"))
+    srcColDetail = GetColByHeaderAny(wsSrc, SRC_HEADER_ROW, Array("細々節", "細々節名称"))
+    If srcColYear * srcColMajor * srcColDetail = 0 Then
+        Err.Raise vbObjectError + 900, , "元シート（表）の必要見出し（年度/大事業/細々節）が見つかりません。"
+    End If
+
+    dstColSerial = GetColByHeaderAny(wsDst, DST_HEADER_ROW, Array("通し番号"))
+    dstColCabinet = GetColByHeaderAny(wsDst, DST_HEADER_ROW, Array("キャビネット番号"))
+    dstColKey = GetColByHeaderAny(wsDst, DST_HEADER_ROW, Array("キー", "結合キー"))
+    dstColYear = GetColByHeaderAny(wsDst, DST_HEADER_ROW, Array("年度"))
+    dstColMajor = GetColByHeaderAny(wsDst, DST_HEADER_ROW, Array("大事業", "大事業名称"))
+    dstColDetail = GetColByHeaderAny(wsDst, DST_HEADER_ROW, Array("細々節", "細々節名称"))
+    If dstColSerial = 0 Then Err.Raise vbObjectError + 901, , "新ファイル基準表の見出し『通し番号』が見つかりません。"
+    If dstColCabinet = 0 Then Err.Raise vbObjectError + 902, , "新ファイル基準表の見出し『キャビネット番号』が見つかりません。"
+    If dstColKey = 0 Then Err.Raise vbObjectError + 903, , "新ファイル基準表の見出し『キー』または『結合キー』が見つかりません。"
+
+    Set dictExists = CreateObject("Scripting.Dictionary")
+    dstLastRow = GetSheetLastUsedRow(wsDst)
+    If dstLastRow >= DST_DATA_START_ROW Then
+        For r = DST_DATA_START_ROW To dstLastRow
+            key = NmlKey(wsDst.Cells(r, dstColKey).Value)
+            If key <> "" Then dictExists(key) = True
+        Next r
+    End If
+
+    srcLastRow = GetSheetLastUsedRow(wsSrc)
+    appendStartRow = 0
+    For r = SRC_DATA_START_ROW To srcLastRow
+        key = NmlKey(CStr(wsSrc.Cells(r, srcColYear).Value) & CStr(wsSrc.Cells(r, srcColMajor).Value) & CStr(wsSrc.Cells(r, srcColDetail).Value))
+        If key = "" Then GoTo ContinueR
+        If dictExists.Exists(key) Then GoTo ContinueR
+
+        dstLastRow = GetSheetLastUsedRow(wsDst)
+        If dstLastRow < DST_DATA_START_ROW Then
+            dstLastRow = DST_DATA_START_ROW - 1
+        End If
+        dstLastRow = dstLastRow + 1
+        If appendStartRow = 0 Then appendStartRow = dstLastRow
+        appendEndRow = dstLastRow
+
+        wsDst.Cells(dstLastRow, dstColKey).Value = key
+        If dstColYear > 0 Then wsDst.Cells(dstLastRow, dstColYear).Value = wsSrc.Cells(r, srcColYear).Value
+        If dstColMajor > 0 Then wsDst.Cells(dstLastRow, dstColMajor).Value = wsSrc.Cells(r, srcColMajor).Value
+        If dstColDetail > 0 Then wsDst.Cells(dstLastRow, dstColDetail).Value = wsSrc.Cells(r, srcColDetail).Value
+        ' キャビネット番号は既存行を維持。新規行は未入力のまま。
+
+        dictExists(key) = True
+        appendedCount = appendedCount + 1
+ContinueR:
+    Next r
+
+    If appendedCount > 0 Then
+        ReindexSerial_NewFileStandard wsDst, appendStartRow, appendEndRow
+    End If
+
+    If appendedCount = 0 Then
+        MsgBox "新規追記対象はありませんでした。", vbInformation
+    Else
+        MsgBox "新ファイル基準表への追記が完了しました。" & vbCrLf & _
+               "追加件数: " & appendedCount, vbInformation
+    End If
+
+FinallyExit:
+    Application.ScreenUpdating = screenUpdatingBefore
+    Application.EnableEvents = enableEventsBefore
+    Application.Calculation = calcMode
+    Exit Sub
+
+ErrHandler:
+    MsgBox "手順2_新ファイル基準表を作成する でエラーが発生しました。" & vbCrLf & _
+           "詳細: " & Err.Description, vbExclamation
+    Resume FinallyExit
+End Sub
+
+Private Sub ReindexSerial_NewFileStandard(ByVal wsDst As Worksheet, Optional ByVal fromRow As Long = 3, Optional ByVal toRow As Long = 0)
+    Const DST_HEADER_ROW As Long = 2
+    Const DST_DATA_START_ROW As Long = 3
+    Dim colSerial As Long
+    Dim maxSerial As Long
+    Dim r As Long
+    Dim rowHasData As Boolean
+    Dim lastRow As Long
+
+    colSerial = GetColByHeaderAny(wsDst, DST_HEADER_ROW, Array("通し番号"))
+    If colSerial = 0 Then Exit Sub
+
+    lastRow = GetSheetLastUsedRow(wsDst)
+    If toRow = 0 Or toRow > lastRow Then toRow = lastRow
+    If fromRow < DST_DATA_START_ROW Then fromRow = DST_DATA_START_ROW
+    If toRow < fromRow Then Exit Sub
+
+    maxSerial = GetMaxSerial_NewFileStandard(wsDst, colSerial, DST_DATA_START_ROW, fromRow - 1)
+
+    For r = fromRow To toRow
+        rowHasData = (Application.WorksheetFunction.CountA(wsDst.Rows(r)) > 0)
+        If rowHasData And Len(Trim$(CStr(wsDst.Cells(r, colSerial).Value))) = 0 Then
+            maxSerial = maxSerial + 1
+            wsDst.Cells(r, colSerial).Value = maxSerial
+        End If
+    Next r
+End Sub
+
+Private Function GetMaxSerial_NewFileStandard(ByVal wsDst As Worksheet, ByVal colSerial As Long, _
+                                              ByVal rowFrom As Long, ByVal rowTo As Long) As Long
+    Dim r As Long
+    Dim v As Variant
+    Dim maxVal As Long
+
+    If rowTo < rowFrom Then
+        GetMaxSerial_NewFileStandard = 0
+        Exit Function
+    End If
+
+    For r = rowFrom To rowTo
+        v = wsDst.Cells(r, colSerial).Value
+        If IsNumeric(v) Then
+            If CLng(v) > maxVal Then maxVal = CLng(v)
+        End If
+    Next r
+
+    GetMaxSerial_NewFileStandard = maxVal
+End Function
+
 
 
 Sub 予算額を表に転写()
