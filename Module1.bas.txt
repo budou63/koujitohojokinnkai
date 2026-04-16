@@ -1081,12 +1081,19 @@ End Function
 
 Sub 科目別事業別歳出一覧編集()
 
+    Const SRC_HEADER_ROW As Long = 2
+    Const SRC_DATA_START_ROW As Long = 3
+
     Dim wsSrc As Worksheet, wsDest As Worksheet
     Dim lastRowSrc As Long, lastColSrc As Long
-    Dim startRowDest As Long
+    Dim appendRowDest As Long, appendStartRow As Long
+    Dim colYear As Long, colBudgetTypeName As Long
+    Dim colMajorName As Long, colDetailName As Long
     Dim r As Long, c As Long
     Dim value As Variant
-    Dim yearStr As String, majorName As String, detailName As String
+    Dim yearStr As String
+    Dim majorName As String
+    Dim detailName As String
     Dim isKurikoshi As Boolean
     Dim appendedCount As Long
     Dim calcMode As XlCalculation
@@ -1109,40 +1116,51 @@ Sub 科目別事業別歳出一覧編集()
 
     lastRowSrc = GetSheetLastUsedRow(wsSrc)
     lastColSrc = GetSheetLastUsedCol(wsSrc)
-    If lastColSrc = 0 Then
+    If lastColSrc = 0 Or lastRowSrc < SRC_DATA_START_ROW Then
         MsgBox "予算（コピペ）に処理対象データがありません。", vbInformation
         GoTo FinallyExit
     End If
 
-    startRowDest = GetBudgetSortAppendStartRow(wsDest)
+    colYear = GetColByHeaderAny(wsSrc, SRC_HEADER_ROW, Array("年度"))
+    colBudgetTypeName = GetColByHeaderAny(wsSrc, SRC_HEADER_ROW, Array("予算区分名称"))
+    colMajorName = GetColByHeaderAny(wsSrc, SRC_HEADER_ROW, Array("大事業名称"))
+    colDetailName = GetColByHeaderAny(wsSrc, SRC_HEADER_ROW, Array("細々節名称"))
+
+    If colYear * colBudgetTypeName * colMajorName * colDetailName = 0 Then
+        Err.Raise vbObjectError + 3100, , "必要な見出し（年度/予算区分名称/大事業名称/細々節名称）が見つかりません。"
+    End If
+
+    appendRowDest = GetBudgetSortAppendStartRow(wsDest)
+    appendStartRow = appendRowDest
+
+    ' 既存運用に合わせ、必要列の非表示状態を維持
     wsDest.Cells.EntireColumn.Hidden = False
 
-    For r = 1 To lastRowSrc
-        If Not IsTargetBudgetRow(wsSrc, r) Then GoTo ContinueRow
+    For r = SRC_DATA_START_ROW To lastRowSrc
+        If Not IsTargetBudgetRow(wsSrc.Cells(r, 1)) Then GoTo ContinueRow
 
         yearStr = ""
-        majorName = ""
-        detailName = ""
+        majorName = ""  ' ※名称キー（旧: majorCode は使わない）
+        detailName = "" ' ※名称キー（旧: detailCode は使わない）
 
-        isKurikoshi = (CStr(wsSrc.Cells(r, 3).Value) = "繰越明許")
+        isKurikoshi = (CStr(wsSrc.Cells(r, colBudgetTypeName).Value) = "繰越明許")
 
         For c = 1 To lastColSrc
             value = wsSrc.Cells(r, c).Value
 
-            If c = 1 Then
+            If c = colYear Then
                 value = ConvertBudgetYearToWareki(value, isKurikoshi)
                 yearStr = CStr(value)
             End If
 
-            If c = 25 Then majorName = value
-            If c = 30 Then detailName = value
+            If c = colMajorName Then majorName = CStr(value)
+            If c = colDetailName Then detailName = CStr(value)
 
-            wsDest.Cells(startRowDest, c + 1).Value = value
+            wsDest.Cells(appendRowDest, c + 1).Value = value
         Next c
 
-        wsDest.Cells(startRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorName, detailName)
-        MarkBudgetRowProcessed wsSrc, r
-        startRowDest = startRowDest + 1
+        wsDest.Cells(appendRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorName, detailName) ' 年度 + 大事業名称 + 細々節名称
+        appendRowDest = appendRowDest + 1
         appendedCount = appendedCount + 1
 ContinueRow:
     Next r
@@ -1158,10 +1176,11 @@ ContinueRow:
     Next i
 
     If appendedCount = 0 Then
-        MsgBox "A列が赤字の未処理データはありません。", vbInformation
+        MsgBox "A列が赤字の行はありませんでした。", vbInformation
     Else
-        MsgBox "赤字行の転写が完了しました。" & vbCrLf & _
-               "追加件数: " & appendedCount, vbInformation
+        MsgBox "赤字行の編集結果を末尾へ追記しました。" & vbCrLf & _
+               "追加件数: " & appendedCount & vbCrLf & _
+               "追記開始行: " & appendStartRow, vbInformation
     End If
 
 FinallyExit:
@@ -1178,18 +1197,23 @@ ErrHandler:
 
 End Sub
 
-Private Function IsTargetBudgetRow(ByVal wsSrc As Worksheet, ByVal rowNo As Long) As Boolean
-    Dim fontColor As Long
+Private Function IsTargetBudgetRow(ByVal targetCell As Range) As Boolean
+    If targetCell Is Nothing Then Exit Function
 
-    fontColor = wsSrc.Cells(rowNo, 1).Font.Color
+    ' 基準: RGB(255, 0, 0)
+    If targetCell.Font.Color = RGB(255, 0, 0) Then
+        IsTargetBudgetRow = True
+        Exit Function
+    End If
 
-    ' まず RGB(255, 0, 0) を基準に判定（必要時はここに赤系条件を追加）
-    IsTargetBudgetRow = (fontColor = RGB(255, 0, 0))
+    ' 補助判定: テーマ差異で赤系の ColorIndex が使われるケース
+    If targetCell.Font.ColorIndex = 3 Then
+        IsTargetBudgetRow = True
+        Exit Function
+    End If
+
+    IsTargetBudgetRow = False
 End Function
-
-Private Sub MarkBudgetRowProcessed(ByVal wsSrc As Worksheet, ByVal rowNo As Long)
-    wsSrc.Cells(rowNo, 1).Font.Color = RGB(0, 0, 0)
-End Sub
 
 Private Function GetBudgetSortAppendStartRow(ByVal wsDest As Worksheet) As Long
     Dim lastCell As Range
@@ -1227,9 +1251,12 @@ Private Function ConvertBudgetYearToWareki(ByVal srcValue As Variant, ByVal isKu
     End If
 End Function
 
-Private Function BuildBudgetSortKey(ByVal yearStr As String, ByVal majorName As String, ByVal detailName As String) As String
-    BuildBudgetSortKey = CStr(yearStr) & CStr(majorName) & CStr(detailName)
+Private Function BuildBudgetSortKey(ByVal yearStr As String, _
+                                    ByVal majorName As String, _
+                                    ByVal detailName As String) As String
+    BuildBudgetSortKey = MakeKey(yearStr, majorName, detailName)
 End Function
+
 
 Public Sub 手順2_新ファイル基準表を作成する()
     Const SRC_SHEET_NAME As String = "表"
