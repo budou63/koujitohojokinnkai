@@ -1087,8 +1087,8 @@ Sub 科目別事業別歳出一覧編集()
     Dim r As Long, c As Long
     Dim value As Variant
     Dim yearStr As String
-    Dim majorName As String, majorCode As String
-    Dim detailName As String, detailCode As String
+    Dim majorCode As String
+    Dim detailCode As String
     Dim isKurikoshi As Boolean
     Dim appendedCount As Long
     Dim calcMode As XlCalculation
@@ -1125,9 +1125,7 @@ Sub 科目別事業別歳出一覧編集()
         If Not IsTargetBudgetRow(wsSrc.Cells(r, 1)) Then GoTo ContinueRow
 
         yearStr = ""
-        majorName = ""
         majorCode = ""
-        detailName = ""
         detailCode = ""
 
         isKurikoshi = (CStr(wsSrc.Cells(r, 3).Value) = "繰越明許")
@@ -1142,13 +1140,10 @@ Sub 科目別事業別歳出一覧編集()
 
             If c = 16 Then majorCode = CStr(value)  ' 大事業
             If c = 21 Then detailCode = CStr(value) ' 細々節
-            If c = 25 Then majorName = CStr(value)  ' 大事業名称
-            If c = 30 Then detailName = CStr(value) ' 細々節名称
-
             wsDest.Cells(appendRowDest, c + 1).Value = value
         Next c
 
-        wsDest.Cells(appendRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorName, majorCode, detailName, detailCode)
+        wsDest.Cells(appendRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorCode, detailCode)
         appendRowDest = appendRowDest + 1
         appendedCount = appendedCount + 1
 ContinueRow:
@@ -1241,23 +1236,9 @@ Private Function ConvertBudgetYearToWareki(ByVal srcValue As Variant, ByVal isKu
 End Function
 
 Private Function BuildBudgetSortKey(ByVal yearStr As String, _
-                                    ByVal majorName As String, ByVal majorCode As String, _
-                                    ByVal detailName As String, ByVal detailCode As String) As String
-    Dim keyMajor As String
-    Dim keyDetail As String
-
-    keyMajor = SelectBudgetKeyPart(majorName, majorCode)
-    keyDetail = SelectBudgetKeyPart(detailName, detailCode)
-
-    BuildBudgetSortKey = MakeKey(yearStr, keyMajor, keyDetail)
-End Function
-
-Private Function SelectBudgetKeyPart(ByVal nameValue As String, ByVal codeValue As String) As String
-    If Len(Nml(nameValue)) > 0 Then
-        SelectBudgetKeyPart = nameValue
-    Else
-        SelectBudgetKeyPart = codeValue
-    End If
+                                    ByVal majorCode As String, _
+                                    ByVal detailCode As String) As String
+    BuildBudgetSortKey = MakeKey(yearStr, majorCode, detailCode)
 End Function
 
 
