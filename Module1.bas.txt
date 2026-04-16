@@ -1140,8 +1140,8 @@ Sub 科目別事業別歳出一覧編集()
         If Not IsTargetBudgetRow(wsSrc.Cells(r, 1)) Then GoTo ContinueRow
 
         yearStr = ""
-        majorName = ""
-        detailName = ""
+        majorCode = ""
+        detailCode = ""
 
         isKurikoshi = (CStr(wsSrc.Cells(r, colBudgetTypeName).Value) = "繰越明許")
 
