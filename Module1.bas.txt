@@ -1140,8 +1140,8 @@ Sub 科目別事業別歳出一覧編集()
         If Not IsTargetBudgetRow(wsSrc.Cells(r, 1)) Then GoTo ContinueRow
 
         yearStr = ""
-        majorCode = ""
-        detailCode = ""
+        majorName = ""  ' ※名称キー（旧: majorCode は使わない）
+        detailName = "" ' ※名称キー（旧: detailCode は使わない）
 
         isKurikoshi = (CStr(wsSrc.Cells(r, colBudgetTypeName).Value) = "繰越明許")
 
@@ -1159,7 +1159,7 @@ Sub 科目別事業別歳出一覧編集()
             wsDest.Cells(appendRowDest, c + 1).Value = value
         Next c
 
-        wsDest.Cells(appendRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorName, detailName)
+        wsDest.Cells(appendRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorName, detailName) ' 年度 + 大事業名称 + 細々節名称
         appendRowDest = appendRowDest + 1
         appendedCount = appendedCount + 1
 ContinueRow:
