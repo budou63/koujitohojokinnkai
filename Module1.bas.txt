@@ -1083,10 +1083,12 @@ Sub 科目別事業別歳出一覧編集()
 
     Dim wsSrc As Worksheet, wsDest As Worksheet
     Dim lastRowSrc As Long, lastColSrc As Long
-    Dim startRowDest As Long
+    Dim appendRowDest As Long
     Dim r As Long, c As Long
     Dim value As Variant
-    Dim yearStr As String, majorName As String, detailName As String
+    Dim yearStr As String
+    Dim majorName As String, majorCode As String
+    Dim detailName As String, detailCode As String
     Dim isKurikoshi As Boolean
     Dim appendedCount As Long
     Dim calcMode As XlCalculation
@@ -1109,20 +1111,24 @@ Sub 科目別事業別歳出一覧編集()
 
     lastRowSrc = GetSheetLastUsedRow(wsSrc)
     lastColSrc = GetSheetLastUsedCol(wsSrc)
-    If lastColSrc = 0 Then
+    If lastColSrc = 0 Or lastRowSrc = 0 Then
         MsgBox "予算（コピペ）に処理対象データがありません。", vbInformation
         GoTo FinallyExit
     End If
 
-    startRowDest = GetBudgetSortAppendStartRow(wsDest)
+    appendRowDest = GetBudgetSortAppendStartRow(wsDest)
+
+    ' 既存運用に合わせ、必要列の非表示状態を維持
     wsDest.Cells.EntireColumn.Hidden = False
 
     For r = 1 To lastRowSrc
-        If Not IsTargetBudgetRow(wsSrc, r) Then GoTo ContinueRow
+        If Not IsTargetBudgetRow(wsSrc.Cells(r, 1)) Then GoTo ContinueRow
 
         yearStr = ""
         majorName = ""
+        majorCode = ""
         detailName = ""
+        detailCode = ""
 
         isKurikoshi = (CStr(wsSrc.Cells(r, 3).Value) = "繰越明許")
 
@@ -1134,15 +1140,16 @@ Sub 科目別事業別歳出一覧編集()
                 yearStr = CStr(value)
             End If
 
-            If c = 25 Then majorName = value
-            If c = 30 Then detailName = value
+            If c = 16 Then majorCode = CStr(value)  ' 大事業
+            If c = 21 Then detailCode = CStr(value) ' 細々節
+            If c = 25 Then majorName = CStr(value)  ' 大事業名称
+            If c = 30 Then detailName = CStr(value) ' 細々節名称
 
-            wsDest.Cells(startRowDest, c + 1).Value = value
+            wsDest.Cells(appendRowDest, c + 1).Value = value
         Next c
 
-        wsDest.Cells(startRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorName, detailName)
-        MarkBudgetRowProcessed wsSrc, r
-        startRowDest = startRowDest + 1
+        wsDest.Cells(appendRowDest, 1).Value = BuildBudgetSortKey(yearStr, majorName, majorCode, detailName, detailCode)
+        appendRowDest = appendRowDest + 1
         appendedCount = appendedCount + 1
 ContinueRow:
     Next r
@@ -1158,10 +1165,11 @@ ContinueRow:
     Next i
 
     If appendedCount = 0 Then
-        MsgBox "A列が赤字の未処理データはありません。", vbInformation
+        MsgBox "A列が赤字の行はありませんでした。", vbInformation
     Else
-        MsgBox "赤字行の転写が完了しました。" & vbCrLf & _
-               "追加件数: " & appendedCount, vbInformation
+        MsgBox "赤字行の編集結果を末尾へ追記しました。" & vbCrLf & _
+               "追加件数: " & appendedCount & vbCrLf & _
+               "追記開始行: " & GetBudgetSortAppendStartRow(wsDest) - appendedCount, vbInformation
     End If
 
 FinallyExit:
@@ -1178,18 +1186,23 @@ ErrHandler:
 
 End Sub
 
-Private Function IsTargetBudgetRow(ByVal wsSrc As Worksheet, ByVal rowNo As Long) As Boolean
-    Dim fontColor As Long
+Private Function IsTargetBudgetRow(ByVal targetCell As Range) As Boolean
+    If targetCell Is Nothing Then Exit Function
 
-    fontColor = wsSrc.Cells(rowNo, 1).Font.Color
+    ' 基準: RGB(255, 0, 0)
+    If targetCell.Font.Color = RGB(255, 0, 0) Then
+        IsTargetBudgetRow = True
+        Exit Function
+    End If
 
-    ' まず RGB(255, 0, 0) を基準に判定（必要時はここに赤系条件を追加）
-    IsTargetBudgetRow = (fontColor = RGB(255, 0, 0))
+    ' 補助判定: テーマ差異で赤系の ColorIndex が使われるケース
+    If targetCell.Font.ColorIndex = 3 Then
+        IsTargetBudgetRow = True
+        Exit Function
+    End If
+
+    IsTargetBudgetRow = False
 End Function
-
-Private Sub MarkBudgetRowProcessed(ByVal wsSrc As Worksheet, ByVal rowNo As Long)
-    wsSrc.Cells(rowNo, 1).Font.Color = RGB(0, 0, 0)
-End Sub
 
 Private Function GetBudgetSortAppendStartRow(ByVal wsDest As Worksheet) As Long
     Dim lastCell As Range
@@ -1227,9 +1240,26 @@ Private Function ConvertBudgetYearToWareki(ByVal srcValue As Variant, ByVal isKu
     End If
 End Function
 
-Private Function BuildBudgetSortKey(ByVal yearStr As String, ByVal majorName As String, ByVal detailName As String) As String
-    BuildBudgetSortKey = CStr(yearStr) & CStr(majorName) & CStr(detailName)
+Private Function BuildBudgetSortKey(ByVal yearStr As String, _
+                                    ByVal majorName As String, ByVal majorCode As String, _
+                                    ByVal detailName As String, ByVal detailCode As String) As String
+    Dim keyMajor As String
+    Dim keyDetail As String
+
+    keyMajor = SelectBudgetKeyPart(majorName, majorCode)
+    keyDetail = SelectBudgetKeyPart(detailName, detailCode)
+
+    BuildBudgetSortKey = MakeKey(yearStr, keyMajor, keyDetail)
 End Function
+
+Private Function SelectBudgetKeyPart(ByVal nameValue As String, ByVal codeValue As String) As String
+    If Len(Nml(nameValue)) > 0 Then
+        SelectBudgetKeyPart = nameValue
+    Else
+        SelectBudgetKeyPart = codeValue
+    End If
+End Function
+
 
 Public Sub 手順2_新ファイル基準表を作成する()
     Const SRC_SHEET_NAME As String = "表"
