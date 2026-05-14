@@ -640,14 +640,16 @@ Sub 結合CSV出力()
         Exit Sub
     End If
 
-    ' === 大字・地番列の取得（①?⑩、無ければ0のまま） ===
+    ' === 大字・地番・単価列の取得（①?⑩、無ければ0のまま） ===
     Dim i As Long, numMark As String
     Dim 大字列(1 To 10) As Long, 元地番列(1 To 10) As Long, 後地番列(1 To 10) As Long
+    Dim 単価列(1 To 10) As Long
     For i = 1 To 10
         numMark = ChrW(9311 + i) ' ①…⑩
         大字列(i) = MapGetCol(colMap, "大字" & numMark)
         元地番列(i) = MapGetCol(colMap, "元地番" & numMark)
         後地番列(i) = MapGetCol(colMap, "後地番" & numMark)
+        単価列(i) = MapGetCol(colMap, "単価" & numMark)
     Next
 
     ' === 出力シート見出し設定 ===
@@ -660,6 +662,7 @@ Sub 結合CSV出力()
         .Cells(1, 6).value = "進捗状況"
         .Cells(1, 7).value = "補助金パッケージ"
         .Cells(1, 8).value = "種別"
+        .Cells(1, 9).value = "単価"
     End With
 
     ' === データ出力 ===
@@ -669,10 +672,13 @@ Sub 結合CSV出力()
     For row = headerRow + 1 To lastRow
         If ws表.Cells(row, flagCol).value = "〇" Then
             For i = 1 To 10
-                Dim 大字 As String, 地番 As String
+                Dim 大字 As String, 地番 As String, 単価 As Variant
 
                 ' --- 大字（列が無ければ空） ---
                 If 大字列(i) > 0 Then 大字 = Trim$(ws表.Cells(row, 大字列(i)).value) Else 大字 = ""
+
+                ' --- 単価（列が無ければ空） ---
+                If 単価列(i) > 0 Then 単価 = ws表.Cells(row, 単価列(i)).value Else 単価 = ""
 
                 ' --- 元地番 ---
                 If 元地番列(i) > 0 Then
@@ -687,6 +693,7 @@ Sub 結合CSV出力()
                             .Cells(outRow, 6).value = ws表.Cells(row, 進捗Col).value
                             .Cells(outRow, 7).value = ws表.Cells(row, パッケージCol).value
                             .Cells(outRow, 8).value = "買収予定地"
+                            .Cells(outRow, 9).value = 単価
                         End With
                         outRow = outRow + 1
                     End If
@@ -705,6 +712,7 @@ Sub 結合CSV出力()
                             .Cells(outRow, 6).value = ws表.Cells(row, 進捗Col).value
                             .Cells(outRow, 7).value = ws表.Cells(row, パッケージCol).value
                             .Cells(outRow, 8).value = "実際に買収"
+                            .Cells(outRow, 9).value = 単価
                         End With
                         outRow = outRow + 1
                     End If
