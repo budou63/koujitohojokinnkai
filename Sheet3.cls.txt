@@ -254,6 +254,28 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                                 End If
                             Next fld
 
+                            ' 前金払後繰越：債務負担額a/単市aのみ差し引き再計算
+                            If val = "前金払後繰越" Then
+                                Dim carryBase As Variant, advancePaid As Variant
+                                Dim hasCarryBase As Boolean, hasAdvancePaid As Boolean
+                                hasCarryBase = colMap.Exists(fromName)
+                                hasAdvancePaid = colMap.Exists(toName)
+
+                                If hasCarryBase Then carryBase = Me.Cells(row, colMap(fromName)).value
+                                If hasAdvancePaid Then advancePaid = Me.Cells(row, colMap(toName)).value
+
+                                If hasCarryBase And hasAdvancePaid And IsNumeric(carryBase) And IsNumeric(advancePaid) Then
+                                    If colMap.Exists("債務負担額a") Then
+                                        Me.Cells(row, colMap("債務負担額a")).value = CDbl(carryBase) - CDbl(advancePaid)
+                                    End If
+                                    If colMap.Exists("単市a") And colMap.Exists("補助対象額a") Then
+                                        If IsNumeric(Me.Cells(row, colMap("補助対象額a")).value) Then
+                                            Me.Cells(row, colMap("単市a")).value = CDbl(Me.Cells(row, colMap("債務負担額a")).value) - CDbl(Me.Cells(row, colMap("補助対象額a")).value)
+                                        End If
+                                    End If
+                                End If
+                            End If
+
                         Case ""
                             Dim clearList As Variant
                             clearList = Array(toName, changeName, designTo, workTo, amt1To, amt2To, amt3To, amt4To)
@@ -277,6 +299,35 @@ If val = "増額変更" Or val = "減額変更" Or val = "工期延期" Or val =
     End If
 End If
 
+                Next cell
+            End If
+        End If
+    Next i
+
+
+    ' === 前金払後繰越：債務負担額入力後の再計算 ===
+    For i = LBound(パターン) To UBound(パターン)
+        condName = パターン(i)(0)
+        fromName = パターン(i)(1)
+        toName = パターン(i)(2)
+
+        If colMap.Exists(condName) And colMap.Exists(toName) Then
+            destCol = colMap(toName)
+            If Not Intersect(Target, Me.Range(Me.Cells(4, destCol), Me.Cells(Rows.Count, destCol).End(xlUp))) Is Nothing Then
+                For Each cell In Intersect(Target, Me.Range(Me.Cells(4, destCol), Me.Cells(Rows.Count, destCol).End(xlUp)))
+                    row = cell.row
+                    If Trim$(CStr(Me.Cells(row, colMap(condName)).value)) = "前金払後繰越" Then
+                        If IsNumeric(Me.Cells(row, colMap(fromName)).value) And IsNumeric(Me.Cells(row, colMap(toName)).value) Then
+                            If colMap.Exists("債務負担額a") Then
+                                Me.Cells(row, colMap("債務負担額a")).value = CDbl(Me.Cells(row, colMap(fromName)).value) - CDbl(Me.Cells(row, colMap(toName)).value)
+                            End If
+                            If colMap.Exists("単市a") And colMap.Exists("補助対象額a") Then
+                                If IsNumeric(Me.Cells(row, colMap("補助対象額a")).value) Then
+                                    Me.Cells(row, colMap("単市a")).value = CDbl(Me.Cells(row, colMap("債務負担額a")).value) - CDbl(Me.Cells(row, colMap("補助対象額a")).value)
+                                End If
+                            End If
+                        End If
+                    End If
                 Next cell
             End If
         End If
