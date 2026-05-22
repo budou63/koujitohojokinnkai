@@ -237,7 +237,12 @@ Private Sub Worksheet_Change(ByVal Target As Range)
                             Me.Cells(row, colMap(changeName)).value = ""
 
                         Case "丸々繰越", "前金払後繰越"
-                            Dim clearCols As Variant: clearCols = Array(changeName, toName, designTo, amt1To, amt2To, amt3To, amt4To)
+                            Dim clearCols As Variant
+                            If val = "前金払後繰越" Then
+                                clearCols = Array(changeName, designTo, amt2To, amt3To, amt4To)
+                            Else
+                                clearCols = Array(changeName, toName, designTo, amt1To, amt2To, amt3To, amt4To)
+                            End If
                             Dim cname As Variant
                             For Each cname In clearCols
                                 If colMap.Exists(cname) Then
@@ -325,6 +330,8 @@ End If
         condName = パターン(i)(0)
         fromName = パターン(i)(1)
         toName = パターン(i)(2)
+        amt1From = パターン(i)(8)
+        amt1To = パターン(i)(9)
 
         If colMap.Exists(condName) And colMap.Exists(toName) And colMap.Exists(amt1To) Then
             Dim hitDebtCol As Range, hitSubsidyCol As Range
