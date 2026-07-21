@@ -1,0 +1,417 @@
+Attribute VB_Name = "mod_DummyExport"
+Option Explicit
+
+Private Const DUMMY_PROCESS_NAME As String = "ダミーブック作成"
+Private Const SHEET_TABLE As String = "表"
+Private Const TABLE_HEADER_ROW As Long = 3
+Private Const TABLE_DATA_ROW As Long = 4
+Private Const DUMMY_LABEL As String = "ダミーデータ"
+
+Private Type DummyAppState
+    ScreenUpdating As Boolean
+    EnableEvents As Boolean
+    DisplayAlerts As Boolean
+    Calculation As Long
+    AutomationSecurity As Long
+End Type
+
+Public Sub ダミーブック作成()
+    Dim outFolder As String
+    Dim tempPath As String
+    Dim outputPath As String
+    Dim workWb As Workbook
+    Dim state As DummyAppState
+    Dim result As Object
+    Dim deleteMessage As String
+    Dim sourceName As String
+    Dim stateSaved As Boolean
+
+    On Error GoTo EH
+
+    outFolder = DE_SelectOutputFolder()
+    If Len(outFolder) = 0 Then Exit Sub
+
+    DE_SaveAppState state
+    stateSaved = True
+    DE_SetBusyAppState
+
+    sourceName = DE_BaseName(ThisWorkbook.Name)
+    tempPath = DE_TempWorkbookPath(sourceName)
+    outputPath = DE_UniqueOutputPath(outFolder, sourceName)
+
+    ThisWorkbook.SaveCopyAs tempPath
+
+    Set workWb = Workbooks.Open(fileName:=tempPath, UpdateLinks:=0, ReadOnly:=False, AddToMru:=False)
+    Set result = DE_CreateResult()
+
+    DE_DummyWorkbook workWb, result
+    Application.CalculateFullRebuild
+
+    workWb.SaveAs fileName:=outputPath, FileFormat:=xlOpenXMLWorkbookMacroEnabled, AddToMru:=False
+    workWb.Close SaveChanges:=False
+    Set workWb = Nothing
+
+    deleteMessage = DE_DeleteFileMessage(tempPath)
+    If stateSaved Then DE_RestoreAppState state
+
+    MsgBox "ダミーブックの作成が完了しました。" & vbCrLf & vbCrLf & _
+           "出力先: " & outputPath & vbCrLf & _
+           "処理したシート: " & DE_JoinKeys(result("Sheets"), "、") & vbCrLf & _
+           "置換したセル数: " & CStr(result("Count")) & vbCrLf & _
+           "存在しなかったシート: " & DE_JoinCollection(result("MissingSheets"), "、", "なし") & vbCrLf & _
+           "存在しなかった対象見出し: " & DE_JoinCollection(result("MissingHeaders"), vbCrLf, "なし") & vbCrLf & _
+           "一時コピー削除: " & deleteMessage & vbCrLf & _
+           "元ブックは変更・上書き・保存していません。", vbInformation, DUMMY_PROCESS_NAME
+    Exit Sub
+
+EH:
+    On Error Resume Next
+    If Not workWb Is Nothing Then workWb.Close SaveChanges:=False
+    deleteMessage = DE_DeleteFileMessage(tempPath)
+    If stateSaved Then DE_RestoreAppState state
+    MsgBox "処理名: " & DUMMY_PROCESS_NAME & vbCrLf & _
+           "エラー番号: " & CStr(Err.Number) & vbCrLf & _
+           "エラー内容: " & Err.Description & vbCrLf & _
+           "途中作成ファイル削除: " & deleteMessage, vbCritical, DUMMY_PROCESS_NAME
+End Sub
+
+Private Sub DE_DummyWorkbook(ByVal wb As Workbook, ByVal result As Object)
+    Dim maps As Object
+    Set maps = CreateObject("Scripting.Dictionary")
+    maps.CompareMode = 1
+    DE_AddMap maps, "name": DE_AddMap maps, "person": DE_AddMap maps, "address"
+    DE_AddMap maps, "zip": DE_AddMap maps, "surveyor": DE_AddMap maps, "bank"
+    DE_AddMap maps, "kana": DE_AddMap maps, "account": DE_AddMap maps, "note"
+    DE_AddMap maps, "user": DE_AddMap maps, "date": DE_AddMap maps, "title": DE_AddMap maps, "accounttype"
+
+    If Not DE_SheetExists(wb, SHEET_TABLE) Then Err.Raise vbObjectError + 7201, DUMMY_PROCESS_NAME, "必須シート『表』が見つかりません。"
+
+    DE_DummyTable wb.Worksheets(SHEET_TABLE), maps, result
+    DE_SetPointValue wb, SHEET_TABLE, "K2", DUMMY_LABEL, result
+    DE_DummyHeaderSheet wb, "工期表", Array("施工業者・債権者", "担当者"), maps, result, False
+    DE_DummyHeaderSheet wb, "結合CSV", Array("業者名", "住所"), maps, result, False
+    DE_DummyHeaderSheet wb, "工事CSV", Array("施工業者・債権者", "代表者", "住所", "担当者", "検査立会人", "検査員"), maps, result, False
+    DE_DummyHeaderSheet wb, "スナップショット", DE_TableHeaders(), maps, result, False
+    DE_SetPointValue wb, "スナップショット", "K2", DUMMY_LABEL, result
+    DE_DummyHeaderSheet wb, "選択リスト", Array("検査員", "土地家屋調査士"), maps, result, False
+    DE_DummyHeaderSheet wb, "差込文書", Array("郵便番号", "住所", "宛名", "敬称"), maps, result, False
+    DE_DummyEditors wb, maps, result
+End Sub
+
+Private Sub DE_DummyTable(ByVal ws As Worksheet, ByVal maps As Object, ByVal result As Object)
+    DE_AddSheetResult result, ws.Name
+    DE_DummyColumns ws, TABLE_HEADER_ROW, TABLE_DATA_ROW, DE_TableHeaders(), maps, result, True
+End Sub
+
+Private Sub DE_DummyHeaderSheet(ByVal wb As Workbook, ByVal sheetName As String, ByVal headers As Variant, ByVal maps As Object, ByVal result As Object, ByVal stopIfMissing As Boolean)
+    Dim ws As Worksheet, headerRow As Long
+    If Not DE_SheetExists(wb, sheetName) Then
+        If stopIfMissing Then Err.Raise vbObjectError + 7202, DUMMY_PROCESS_NAME, "必須シート『" & sheetName & "』が見つかりません。"
+        DE_AddUnique result("MissingSheets"), sheetName
+        Exit Sub
+    End If
+    Set ws = wb.Worksheets(sheetName)
+    DE_AddSheetResult result, ws.Name
+    headerRow = DE_FindHeaderRow(ws, headers)
+    If headerRow = 0 Then
+        DE_AddUnique result("MissingHeaders"), sheetName & ": 見出し行（" & DE_JoinArray(headers, "、") & "）"
+        Exit Sub
+    End If
+    DE_DummyColumns ws, headerRow, headerRow + 1, headers, maps, result, False
+End Sub
+
+Private Sub DE_DummyEditors(ByVal wb As Workbook, ByVal maps As Object, ByVal result As Object)
+    Dim ws As Worksheet, lastRow As Long, lastCol As Long, r As Long, c As Long
+    If Not DE_SheetExists(wb, "台帳編集者") Then DE_AddUnique result("MissingSheets"), "台帳編集者": Exit Sub
+    Set ws = wb.Worksheets("台帳編集者")
+    DE_AddSheetResult result, ws.Name
+    lastRow = DE_LastRow(ws): lastCol = DE_LastCol(ws)
+    For r = 2 To lastRow
+        For c = 1 To lastCol
+            DE_ReplaceCell ws.Cells(r, c), "最終編集者", maps, result, True
+        Next c
+    Next r
+End Sub
+
+Private Sub DE_DummyColumns(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal dataRow As Long, ByVal headers As Variant, ByVal maps As Object, ByVal result As Object, ByVal useAliases As Boolean)
+    Dim i As Long, col As Long, lastRow As Long, r As Long, headerName As String
+    lastRow = DE_LastRow(ws)
+    For i = LBound(headers) To UBound(headers)
+        headerName = CStr(headers(i))
+        col = DE_FindHeaderCol(ws, headerRow, headerName)
+        If col = 0 And useAliases Then col = DE_FindAliasCol(ws, headerRow, headerName)
+        If col = 0 Then
+            DE_AddUnique result("MissingHeaders"), ws.Name & ": " & headerName
+        Else
+            For r = dataRow To lastRow
+                DE_ReplaceCell ws.Cells(r, col), headerName, maps, result, False
+            Next r
+        End If
+    Next i
+End Sub
+
+Private Sub DE_ReplaceCell(ByVal cell As Range, ByVal headerName As String, ByVal maps As Object, ByVal result As Object, ByVal allowFormula As Boolean)
+    Dim v As Variant, newValue As Variant
+    If cell Is Nothing Then Exit Sub
+    If cell.HasFormula And Not allowFormula Then Exit Sub
+    v = cell.Value
+    If IsError(v) Or Len(CStr(v)) = 0 Then Exit Sub
+    newValue = DE_DummyValue(CStr(v), headerName, maps)
+    If CStr(newValue) <> CStr(v) Then
+        If DE_Category(headerName) = "zip" Or DE_Category(headerName) = "account" Then cell.NumberFormat = "@"
+        cell.Value = newValue
+        result("Count") = CLng(result("Count")) + 1
+    End If
+End Sub
+
+Private Function DE_DummyValue(ByVal originalText As String, ByVal headerName As String, ByVal maps As Object) As Variant
+    Dim category As String, parts As Variant, i As Long, sep As String
+    category = DE_Category(headerName)
+    If InStr(originalText, vbCrLf) > 0 Or InStr(originalText, vbLf) > 0 Or InStr(originalText, vbCr) > 0 Then
+        sep = IIf(InStr(originalText, vbCrLf) > 0, vbCrLf, IIf(InStr(originalText, vbCr) > 0, vbCr, vbLf))
+        parts = Split(originalText, sep)
+        For i = LBound(parts) To UBound(parts)
+            If Len(CStr(parts(i))) > 0 Then parts(i) = DE_MapValue(maps(category), CStr(parts(i)), category)
+        Next i
+        DE_DummyValue = Join(parts, sep)
+    Else
+        DE_DummyValue = DE_MapValue(maps(category), originalText, category)
+    End If
+End Function
+
+Private Function DE_MapValue(ByVal dict As Object, ByVal key As String, ByVal category As String) As Variant
+    Dim n As Long
+    If dict.Exists(key) Then DE_MapValue = dict(key): Exit Function
+    n = dict.Count + 1
+    Select Case category
+        Case "name": DE_MapValue = "株式会社ダミー建設" & Format$(n, "000")
+        Case "person": DE_MapValue = "架空 太郎" & Format$(n, "000")
+        Case "address": DE_MapValue = "架空県架空市ダミー町" & Format$(n, "000") & "丁目1番1号"
+        Case "zip": DE_MapValue = "000-" & Format$(n, "0000")
+        Case "surveyor": DE_MapValue = "架空土地家屋調査士" & Format$(n, "000")
+        Case "bank": DE_MapValue = "ダミー銀行 ダミー支店" & Format$(n, "000")
+        Case "kana": DE_MapValue = "カクウ タロウ" & Format$(n, "000")
+        Case "account": DE_MapValue = Format$(n, "0000000")
+        Case "note": DE_MapValue = "ダミー備考" & Format$(n, "000")
+        Case "user": DE_MapValue = "DUMMY_USER_" & Format$(n, "000")
+        Case "date": DE_MapValue = DateSerial(2020, 1, 1) + n
+        Case "title": DE_MapValue = IIf(InStr(key, "御中") > 0 Or InStr(key, "会社") > 0 Or InStr(key, "法人") > 0, "御中", "様")
+        Case "accounttype": DE_MapValue = "ダミー種目" & Format$(n, "000")
+        Case Else: DE_MapValue = "架空 太郎" & Format$(n, "000")
+    End Select
+    dict.Add key, DE_MapValue
+End Function
+
+Private Function DE_Category(ByVal headerName As String) As String
+    Select Case DE_NormalizeHeader(headerName)
+        Case DE_NormalizeHeader("住所"), DE_NormalizeHeader("土地所有者住所"), DE_NormalizeHeader("相続人住所①"), DE_NormalizeHeader("相続人住所②"), DE_NormalizeHeader("相続人住所③"), DE_NormalizeHeader("相続人住所④"), DE_NormalizeHeader("相続人住所⑤"), DE_NormalizeHeader("根抵当権者住所"), DE_NormalizeHeader("送付先住所")
+            DE_Category = "address"
+        Case DE_NormalizeHeader("郵便番号"), DE_NormalizeHeader("送付先郵便番号")
+            DE_Category = "zip"
+        Case DE_NormalizeHeader("担当者"), DE_NormalizeHeader("土木担当員"), DE_NormalizeHeader("検査立会人"), DE_NormalizeHeader("検査員"), DE_NormalizeHeader("代表者"), DE_NormalizeHeader("土地所有者"), DE_NormalizeHeader("相続人①"), DE_NormalizeHeader("相続人②"), DE_NormalizeHeader("相続人③"), DE_NormalizeHeader("相続人④"), DE_NormalizeHeader("相続人⑤"), DE_NormalizeHeader("根抵当権者氏名"), DE_NormalizeHeader("送付先氏名"), DE_NormalizeHeader("担当測量士"), DE_NormalizeHeader("宛名")
+            DE_Category = "person"
+        Case DE_NormalizeHeader("土地家屋調査士")
+            DE_Category = "surveyor"
+        Case DE_NormalizeHeader("振込先"), DE_NormalizeHeader("振込先2"), DE_NormalizeHeader("業者名"), DE_NormalizeHeader("施工業者・債権者")
+            If DE_NormalizeHeader(headerName) = DE_NormalizeHeader("振込先") Or DE_NormalizeHeader(headerName) = DE_NormalizeHeader("振込先2") Then DE_Category = "bank" Else DE_Category = "name"
+        Case DE_NormalizeHeader("口座名義"), DE_NormalizeHeader("口座名義2")
+            DE_Category = "kana"
+        Case DE_NormalizeHeader("口座番号"), DE_NormalizeHeader("口座番号2")
+            DE_Category = "account"
+        Case DE_NormalizeHeader("備考")
+            DE_Category = "note"
+        Case DE_NormalizeHeader("最終編集者")
+            DE_Category = "user"
+        Case DE_NormalizeHeader("最終編集日時")
+            DE_Category = "date"
+        Case DE_NormalizeHeader("敬称")
+            DE_Category = "title"
+        Case DE_NormalizeHeader("種目"), DE_NormalizeHeader("種目2")
+            DE_Category = "accounttype"
+        Case Else
+            DE_Category = "name"
+    End Select
+End Function
+
+Private Function DE_TableHeaders() As Variant
+    DE_TableHeaders = Array("施工業者・債権者", "代表者", "住所", "郵便番号", "担当者", "土木担当員", "検査立会人", "検査員", "土地所有者住所", "土地所有者", "相続人住所①", "相続人①", "相続人住所②", "相続人②", "相続人住所③", "相続人③", "相続人住所④", "相続人④", "相続人住所⑤", "相続人⑤", "根抵当権者住所", "根抵当権者氏名", "送付先郵便番号", "送付先住所", "送付先氏名", "担当測量士", "備考", "口座名義", "振込先", "種目", "口座番号", "口座名義2", "振込先2", "種目2", "口座番号2", "最終編集者", "最終編集日時")
+End Function
+
+Private Function DE_FindAliasCol(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal currentHeader As String) As Long
+    Select Case DE_NormalizeHeader(currentHeader)
+        Case DE_NormalizeHeader("振込先"): DE_FindAliasCol = DE_FindHeaderCol(ws, headerRow, "振込先1")
+        Case DE_NormalizeHeader("種目"): DE_FindAliasCol = DE_FindHeaderCol(ws, headerRow, "種目1")
+        Case DE_NormalizeHeader("口座番号"): DE_FindAliasCol = DE_FindHeaderCol(ws, headerRow, "口座番号1")
+        Case DE_NormalizeHeader("口座名義"): DE_FindAliasCol = DE_FindHeaderCol(ws, headerRow, "口座名義1")
+    End Select
+End Function
+
+Private Function DE_FindHeaderRow(ByVal ws As Worksheet, ByVal headers As Variant) As Long
+    Dim r As Long, c As Long, maxR As Long, hits As Long, i As Long, lastCol As Long
+    maxR = Application.Min(20, DE_LastRow(ws))
+    For r = 1 To maxR
+        hits = 0: lastCol = DE_LastCol(ws)
+        For c = 1 To lastCol
+            For i = LBound(headers) To UBound(headers)
+                If DE_NormalizeHeader(ws.Cells(r, c).Value) = DE_NormalizeHeader(CStr(headers(i))) Then hits = hits + 1
+            Next i
+        Next c
+        If hits > 0 Then DE_FindHeaderRow = r: Exit Function
+    Next r
+End Function
+
+Private Function DE_FindHeaderCol(ByVal ws As Worksheet, ByVal headerRow As Long, ByVal headerName As String) As Long
+    Dim c As Long, lastCol As Long, target As String
+    target = DE_NormalizeHeader(headerName): lastCol = DE_LastCol(ws)
+    For c = 1 To lastCol
+        If DE_NormalizeHeader(ws.Cells(headerRow, c).Value) = target Then DE_FindHeaderCol = c: Exit Function
+    Next c
+End Function
+
+Private Function DE_NormalizeHeader(ByVal v As Variant) As String
+    Dim s As String
+    s = CStr(v)
+    s = Replace(s, vbCr, ""): s = Replace(s, vbLf, "")
+    s = Replace(s, ChrW(&H3000), " ")
+    s = Trim$(s)
+    Do While InStr(s, "  ") > 0: s = Replace(s, "  ", " "): Loop
+    DE_NormalizeHeader = s
+End Function
+
+Private Function DE_LastRow(ByVal ws As Worksheet) As Long
+    Dim lastCell As Range
+    Set lastCell = ws.Cells.Find(What:="*", After:=ws.Cells(1, 1), LookIn:=xlFormulas, LookAt:=xlPart, SearchOrder:=xlByRows, SearchDirection:=xlPrevious, MatchCase:=False)
+    If lastCell Is Nothing Then DE_LastRow = 1 Else DE_LastRow = lastCell.Row
+End Function
+
+Private Function DE_LastCol(ByVal ws As Worksheet) As Long
+    Dim lastCell As Range
+    Set lastCell = ws.Cells.Find(What:="*", After:=ws.Cells(1, 1), LookIn:=xlFormulas, LookAt:=xlPart, SearchOrder:=xlByColumns, SearchDirection:=xlPrevious, MatchCase:=False)
+    If lastCell Is Nothing Then DE_LastCol = 1 Else DE_LastCol = lastCell.Column
+End Function
+
+Private Sub DE_SetPointValue(ByVal wb As Workbook, ByVal sheetName As String, ByVal addressText As String, ByVal valueText As String, ByVal result As Object)
+    If Not DE_SheetExists(wb, sheetName) Then DE_AddUnique result("MissingSheets"), sheetName: Exit Sub
+    wb.Worksheets(sheetName).Range(addressText).Value = valueText
+    DE_AddSheetResult result, sheetName
+    result("Count") = CLng(result("Count")) + 1
+End Sub
+
+Private Function DE_SelectOutputFolder() As String
+    With Application.FileDialog(msoFileDialogFolderPicker)
+        .Title = "ダミーブックの保存先フォルダを選択してください"
+        .AllowMultiSelect = False
+        If .Show <> -1 Then Exit Function
+        DE_SelectOutputFolder = .SelectedItems(1)
+    End With
+End Function
+
+Private Function DE_TempWorkbookPath(ByVal baseName As String) As String
+    Randomize
+    DE_TempWorkbookPath = Environ$("TEMP") & Application.PathSeparator & baseName & "_dummy_work_" & Format$(Now, "yyyymmdd_HHnnss") & "_" & Format$(CLng(Rnd() * 100000), "00000") & ".xlsm"
+End Function
+
+Private Function DE_UniqueOutputPath(ByVal folderPath As String, ByVal baseName As String) As String
+    Dim candidate As String, n As Long
+    candidate = folderPath & Application.PathSeparator & baseName & "_ダミー_" & Format$(Now, "yyyymmdd_HHnnss") & ".xlsm"
+    Do While Len(Dir$(candidate)) > 0
+        n = n + 1
+        candidate = folderPath & Application.PathSeparator & baseName & "_ダミー_" & Format$(Now, "yyyymmdd_HHnnss") & "_" & Format$(n, "00") & ".xlsm"
+    Loop
+    DE_UniqueOutputPath = candidate
+End Function
+
+Private Function DE_BaseName(ByVal fileName As String) As String
+    Dim p As Long
+    p = InStrRev(fileName, ".")
+    If p > 0 Then DE_BaseName = Left$(fileName, p - 1) Else DE_BaseName = fileName
+End Function
+
+Private Sub DE_SaveAppState(ByRef state As DummyAppState)
+    state.ScreenUpdating = Application.ScreenUpdating
+    state.EnableEvents = Application.EnableEvents
+    state.DisplayAlerts = Application.DisplayAlerts
+    state.Calculation = Application.Calculation
+    state.AutomationSecurity = Application.AutomationSecurity
+End Sub
+
+Private Sub DE_SetBusyAppState()
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.DisplayAlerts = False
+    Application.Calculation = xlCalculationManual
+    Application.AutomationSecurity = msoAutomationSecurityForceDisable
+End Sub
+
+Private Sub DE_RestoreAppState(ByRef state As DummyAppState)
+    Application.AutomationSecurity = state.AutomationSecurity
+    Application.Calculation = state.Calculation
+    Application.DisplayAlerts = state.DisplayAlerts
+    Application.EnableEvents = state.EnableEvents
+    Application.ScreenUpdating = state.ScreenUpdating
+End Sub
+
+Private Function DE_CreateResult() As Object
+    Set DE_CreateResult = CreateObject("Scripting.Dictionary")
+    DE_CreateResult.CompareMode = 1
+    Set DE_CreateResult("Sheets") = CreateObject("Scripting.Dictionary")
+    DE_CreateResult("Sheets").CompareMode = 1
+    Set DE_CreateResult("MissingSheets") = New Collection
+    Set DE_CreateResult("MissingHeaders") = New Collection
+    DE_CreateResult("Count") = 0
+End Function
+
+Private Sub DE_AddMap(ByVal maps As Object, ByVal key As String)
+    Set maps(key) = CreateObject("Scripting.Dictionary")
+    maps(key).CompareMode = 0
+End Sub
+
+Private Sub DE_AddSheetResult(ByVal result As Object, ByVal sheetName As String)
+    If Not result("Sheets").Exists(sheetName) Then result("Sheets").Add sheetName, True
+End Sub
+
+Private Sub DE_AddUnique(ByVal col As Collection, ByVal text As String)
+    Dim v As Variant
+    For Each v In col
+        If CStr(v) = text Then Exit Sub
+    Next v
+    col.Add text
+End Sub
+
+Private Function DE_SheetExists(ByVal wb As Workbook, ByVal sheetName As String) As Boolean
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = wb.Worksheets(sheetName)
+    DE_SheetExists = Not ws Is Nothing
+    On Error GoTo 0
+End Function
+
+Private Function DE_DeleteFileMessage(ByVal pathText As String) As String
+    If Len(pathText) = 0 Then DE_DeleteFileMessage = "対象なし": Exit Function
+    If Len(Dir$(pathText)) = 0 Then DE_DeleteFileMessage = "削除済み": Exit Function
+    Kill pathText
+    If Len(Dir$(pathText)) = 0 Then DE_DeleteFileMessage = "削除しました" Else DE_DeleteFileMessage = "削除できませんでした"
+End Function
+
+Private Function DE_JoinCollection(ByVal col As Collection, ByVal delimiter As String, ByVal emptyText As String) As String
+    Dim v As Variant, s As String
+    For Each v In col
+        If Len(s) > 0 Then s = s & delimiter
+        s = s & CStr(v)
+    Next v
+    If Len(s) = 0 Then s = emptyText
+    DE_JoinCollection = s
+End Function
+
+Private Function DE_JoinKeys(ByVal dict As Object, ByVal delimiter As String) As String
+    If dict.Count = 0 Then DE_JoinKeys = "なし" Else DE_JoinKeys = Join(dict.Keys, delimiter)
+End Function
+
+Private Function DE_JoinArray(ByVal values As Variant, ByVal delimiter As String) As String
+    Dim i As Long, s As String
+    For i = LBound(values) To UBound(values)
+        If Len(s) > 0 Then s = s & delimiter
+        s = s & CStr(values(i))
+    Next i
+    DE_JoinArray = s
+End Function
