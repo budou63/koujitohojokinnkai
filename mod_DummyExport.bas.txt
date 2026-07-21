@@ -22,36 +22,62 @@ Public Sub ダミーブック作成()
     Dim workWb As Workbook
     Dim state As DummyAppState
     Dim result As Object
-    Dim deleteMessage As String
+    Dim tempDeleteMessage As String
+    Dim outputDeleteMessage As String
+    Dim closeMessage As String
     Dim sourceName As String
     Dim stateSaved As Boolean
+    Dim completed As Boolean
+    Dim outputExistedBefore As Boolean
+    Dim stage As String
+    Dim originalErrNumber As Long
+    Dim originalErrDescription As String
+    Dim originalErrSource As String
+    Dim originalErrStage As String
 
     On Error GoTo EH
 
+    stage = "出力先フォルダ選択"
     outFolder = DE_SelectOutputFolder()
     If Len(outFolder) = 0 Then Exit Sub
 
+    stage = "Application状態保存"
     DE_SaveAppState state
     stateSaved = True
     DE_SetBusyAppState
 
+    stage = "一時ファイルパス作成"
     sourceName = DE_BaseName(ThisWorkbook.Name)
     tempPath = DE_TempWorkbookPath(sourceName)
     outputPath = DE_UniqueOutputPath(outFolder, sourceName)
+    outputExistedBefore = (Len(Dir$(outputPath)) > 0)
 
+    stage = "SaveCopyAsによる一時コピー作成"
     ThisWorkbook.SaveCopyAs tempPath
 
+    stage = "一時コピーを開く"
     Set workWb = Workbooks.Open(fileName:=tempPath, UpdateLinks:=0, ReadOnly:=False, AddToMru:=False)
+
+    stage = "処理結果オブジェクト作成"
     Set result = DE_CreateResult()
 
-    DE_DummyWorkbook workWb, result
+    DE_DummyWorkbook workWb, result, stage
+
+    stage = "数式再計算"
     Application.CalculateFullRebuild
 
+    stage = "最終ファイル保存"
     workWb.SaveAs fileName:=outputPath, FileFormat:=xlOpenXMLWorkbookMacroEnabled, AddToMru:=False
+
+    stage = "作業ブックを閉じる"
     workWb.Close SaveChanges:=False
     Set workWb = Nothing
+    closeMessage = "閉じました"
+    completed = True
 
-    deleteMessage = DE_DeleteFileMessage(tempPath)
+    stage = "一時ファイル削除"
+    tempDeleteMessage = DE_DeleteFileMessage(tempPath)
+    outputDeleteMessage = "正常完了のため削除対象外"
     If stateSaved Then DE_RestoreAppState state
 
     MsgBox "ダミーブックの作成が完了しました。" & vbCrLf & vbCrLf & _
@@ -60,22 +86,54 @@ Public Sub ダミーブック作成()
            "置換したセル数: " & CStr(result("Count")) & vbCrLf & _
            "存在しなかったシート: " & DE_JoinCollection(result("MissingSheets"), "、", "なし") & vbCrLf & _
            "存在しなかった対象見出し: " & DE_JoinCollection(result("MissingHeaders"), vbCrLf, "なし") & vbCrLf & _
-           "一時コピー削除: " & deleteMessage & vbCrLf & _
+           "一時コピー削除: " & tempDeleteMessage & vbCrLf & _
            "元ブックは変更・上書き・保存していません。", vbInformation, DUMMY_PROCESS_NAME
     Exit Sub
 
 EH:
+    originalErrNumber = Err.Number
+    originalErrDescription = Err.Description
+    originalErrSource = Err.Source
+    originalErrStage = stage
+
     On Error Resume Next
-    If Not workWb Is Nothing Then workWb.Close SaveChanges:=False
-    deleteMessage = DE_DeleteFileMessage(tempPath)
+    Err.Clear
+    If Not workWb Is Nothing Then
+        workWb.Close SaveChanges:=False
+        If Err.Number = 0 Then closeMessage = "閉じました" Else closeMessage = "閉じる処理でエラー: " & CStr(Err.Number)
+        Set workWb = Nothing
+        Err.Clear
+    Else
+        closeMessage = "対象なし"
+    End If
+
+    tempDeleteMessage = DE_DeleteFileMessage(tempPath)
+    Err.Clear
+
+    If Not completed And Len(outputPath) > 0 And Not outputExistedBefore Then
+        outputDeleteMessage = DE_DeleteFileMessage(outputPath)
+    ElseIf outputExistedBefore Then
+        outputDeleteMessage = "既存ファイルのため削除対象外"
+    Else
+        outputDeleteMessage = "対象なし"
+    End If
+    Err.Clear
+
     If stateSaved Then DE_RestoreAppState state
+
     MsgBox "処理名: " & DUMMY_PROCESS_NAME & vbCrLf & _
-           "エラー番号: " & CStr(Err.Number) & vbCrLf & _
-           "エラー内容: " & Err.Description & vbCrLf & _
-           "途中作成ファイル削除: " & deleteMessage, vbCritical, DUMMY_PROCESS_NAME
+           "処理段階: " & originalErrStage & vbCrLf & _
+           "エラー番号: " & CStr(originalErrNumber) & vbCrLf & _
+           "エラー内容: " & originalErrDescription & vbCrLf & _
+           "エラー発生元: " & originalErrSource & vbCrLf & _
+           "一時ファイル: " & DE_SafePathForMessage(tempPath) & vbCrLf & _
+           "最終出力予定先: " & DE_SafePathForMessage(outputPath) & vbCrLf & _
+           "作業ブックを閉じたか: " & closeMessage & vbCrLf & _
+           "一時ファイルを削除したか: " & tempDeleteMessage & vbCrLf & _
+           "途中まで作成された出力ファイルを削除したか: " & outputDeleteMessage, vbCritical, DUMMY_PROCESS_NAME
 End Sub
 
-Private Sub DE_DummyWorkbook(ByVal wb As Workbook, ByVal result As Object)
+Private Sub DE_DummyWorkbook(ByVal wb As Workbook, ByVal result As Object, ByRef stage As String)
     Dim maps As Object
     Set maps = CreateObject("Scripting.Dictionary")
     maps.CompareMode = 1
@@ -86,15 +144,23 @@ Private Sub DE_DummyWorkbook(ByVal wb As Workbook, ByVal result As Object)
 
     If Not DE_SheetExists(wb, SHEET_TABLE) Then Err.Raise vbObjectError + 7201, DUMMY_PROCESS_NAME, "必須シート『表』が見つかりません。"
 
+    stage = "表シートのダミー化"
     DE_DummyTable wb.Worksheets(SHEET_TABLE), maps, result
     DE_SetPointValue wb, SHEET_TABLE, "K2", DUMMY_LABEL, result
+    stage = "工期表のダミー化"
     DE_DummyHeaderSheet wb, "工期表", Array("施工業者・債権者", "担当者"), maps, result, False
+    stage = "結合CSVのダミー化"
     DE_DummyHeaderSheet wb, "結合CSV", Array("業者名", "住所"), maps, result, False
+    stage = "工事CSVのダミー化"
     DE_DummyHeaderSheet wb, "工事CSV", Array("施工業者・債権者", "代表者", "住所", "担当者", "検査立会人", "検査員"), maps, result, False
+    stage = "スナップショットのダミー化"
     DE_DummyHeaderSheet wb, "スナップショット", DE_TableHeaders(), maps, result, False
     DE_SetPointValue wb, "スナップショット", "K2", DUMMY_LABEL, result
+    stage = "選択リストのダミー化"
     DE_DummyHeaderSheet wb, "選択リスト", Array("検査員", "土地家屋調査士"), maps, result, False
+    stage = "差込文書のダミー化"
     DE_DummyHeaderSheet wb, "差込文書", Array("郵便番号", "住所", "宛名", "敬称"), maps, result, False
+    stage = "台帳編集者のダミー化"
     DE_DummyEditors wb, maps, result
 End Sub
 
@@ -151,15 +217,20 @@ Private Sub DE_DummyColumns(ByVal ws As Worksheet, ByVal headerRow As Long, ByVa
 End Sub
 
 Private Sub DE_ReplaceCell(ByVal cell As Range, ByVal headerName As String, ByVal maps As Object, ByVal result As Object, ByVal allowFormula As Boolean)
-    Dim v As Variant, newValue As Variant
+    Dim target As Range
+    Dim v As Variant
+    Dim newValue As Variant
     If cell Is Nothing Then Exit Sub
-    If cell.HasFormula And Not allowFormula Then Exit Sub
-    v = cell.Value
-    If IsError(v) Or Len(CStr(v)) = 0 Then Exit Sub
+    Set target = cell
+    If target.MergeCells Then Set target = target.MergeArea.Cells(1, 1)
+    If target.HasFormula And Not allowFormula Then Exit Sub
+    v = target.Value
+    If IsError(v) Then Exit Sub
+    If Len(CStr(v)) = 0 Then Exit Sub
     newValue = DE_DummyValue(CStr(v), headerName, maps)
     If CStr(newValue) <> CStr(v) Then
-        If DE_Category(headerName) = "zip" Or DE_Category(headerName) = "account" Then cell.NumberFormat = "@"
-        cell.Value = newValue
+        If DE_Category(headerName) = "zip" Or DE_Category(headerName) = "account" Then target.NumberFormat = "@"
+        target.Value = newValue
         result("Count") = CLng(result("Count")) + 1
     End If
 End Sub
@@ -291,8 +362,11 @@ Private Function DE_LastCol(ByVal ws As Worksheet) As Long
 End Function
 
 Private Sub DE_SetPointValue(ByVal wb As Workbook, ByVal sheetName As String, ByVal addressText As String, ByVal valueText As String, ByVal result As Object)
+    Dim target As Range
     If Not DE_SheetExists(wb, sheetName) Then DE_AddUnique result("MissingSheets"), sheetName: Exit Sub
-    wb.Worksheets(sheetName).Range(addressText).Value = valueText
+    Set target = wb.Worksheets(sheetName).Range(addressText)
+    If target.MergeCells Then Set target = target.MergeArea.Cells(1, 1)
+    target.Value = valueText
     DE_AddSheetResult result, sheetName
     result("Count") = CLng(result("Count")) + 1
 End Sub
@@ -352,13 +426,24 @@ Private Sub DE_RestoreAppState(ByRef state As DummyAppState)
 End Sub
 
 Private Function DE_CreateResult() As Object
-    Set DE_CreateResult = CreateObject("Scripting.Dictionary")
-    DE_CreateResult.CompareMode = 1
-    Set DE_CreateResult("Sheets") = CreateObject("Scripting.Dictionary")
-    DE_CreateResult("Sheets").CompareMode = 1
-    Set DE_CreateResult("MissingSheets") = New Collection
-    Set DE_CreateResult("MissingHeaders") = New Collection
-    DE_CreateResult("Count") = 0
+    Dim result As Object
+    Dim sheets As Object
+    Dim missingSheets As Collection
+    Dim missingHeaders As Collection
+
+    Set result = CreateObject("Scripting.Dictionary")
+    result.CompareMode = 1
+    Set sheets = CreateObject("Scripting.Dictionary")
+    sheets.CompareMode = 1
+    Set missingSheets = New Collection
+    Set missingHeaders = New Collection
+
+    result.Add "Sheets", sheets
+    result.Add "MissingSheets", missingSheets
+    result.Add "MissingHeaders", missingHeaders
+    result.Add "Count", 0
+
+    Set DE_CreateResult = result
 End Function
 
 Private Sub DE_AddMap(ByVal maps As Object, ByVal key As String)
@@ -389,8 +474,20 @@ End Function
 Private Function DE_DeleteFileMessage(ByVal pathText As String) As String
     If Len(pathText) = 0 Then DE_DeleteFileMessage = "対象なし": Exit Function
     If Len(Dir$(pathText)) = 0 Then DE_DeleteFileMessage = "削除済み": Exit Function
+    Err.Clear
     Kill pathText
-    If Len(Dir$(pathText)) = 0 Then DE_DeleteFileMessage = "削除しました" Else DE_DeleteFileMessage = "削除できませんでした"
+    If Err.Number <> 0 Then
+        DE_DeleteFileMessage = "削除できませんでした（" & CStr(Err.Number) & "）"
+        Err.Clear
+    ElseIf Len(Dir$(pathText)) = 0 Then
+        DE_DeleteFileMessage = "削除しました"
+    Else
+        DE_DeleteFileMessage = "削除できませんでした"
+    End If
+End Function
+
+Private Function DE_SafePathForMessage(ByVal pathText As String) As String
+    If Len(pathText) = 0 Then DE_SafePathForMessage = "未作成" Else DE_SafePathForMessage = pathText
 End Function
 
 Private Function DE_JoinCollection(ByVal col As Collection, ByVal delimiter As String, ByVal emptyText As String) As String
