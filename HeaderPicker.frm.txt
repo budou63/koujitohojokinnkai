@@ -284,6 +284,11 @@ Private Sub CommandButton8_Click()
     Call 予算CSV取込_追記
 End Sub
 
+Private Sub CommandButton9_Click()
+    ' 標準モジュールのマクロを呼び出す
+    Call ダミーブック作成
+End Sub
+
 ' スナップショットボタン（Caption: スナップショット）
 Private Sub CommandButton7_Click()
     On Error GoTo EH
