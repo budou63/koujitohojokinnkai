@@ -1,5 +1,11 @@
 Option Explicit
 
+Private Const SPLIT_HISTORY_HEADER_ROW As Long = 3
+Private Const SPLIT_HISTORY_FIRST_DATA_ROW As Long = 4
+Private mPreviousSelectionAddress As String
+Private mPreviousSelectionValue As Variant
+Private mPreviousSelectionCaptured As Boolean
+
 Private Sub CommandButton1_Click()
 
 End Sub
@@ -16,11 +22,21 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     Dim srcCol As Long, condCol As Long, destCol As Long
     Dim colMap As Object
     Dim currentUserId As String
+    Dim previousParcelValue As Variant
+    Dim previousParcelValueCaptured As Boolean
     Dim eventsBefore As Boolean  ' ★FIX: EnableEvents 復元用退避
     Set colMap = CreateObject("Scripting.Dictionary")
 
     eventsBefore = Application.EnableEvents ' ★FIX: 復元用に現在値を保持
     On Error GoTo ErrorHandler
+    previousParcelValueCaptured = False
+    If Target.Cells.CountLarge = 1 Then
+        If mPreviousSelectionCaptured And Target.Address(False, False) = mPreviousSelectionAddress Then
+            previousParcelValue = mPreviousSelectionValue
+            previousParcelValueCaptured = True
+        End If
+    End If
+    mPreviousSelectionCaptured = False
     
     ' === 修正ポイント①：1行目（通し番号行）の変更時は処理をスキップ ===
     If Not Intersect(Target, Me.Rows(1)) Is Nothing Then
@@ -33,6 +49,8 @@ Private Sub Worksheet_Change(ByVal Target As Range)
     End If
     
     Application.EnableEvents = False
+
+    Call HandleSplitParcelChange(Target, previousParcelValue, previousParcelValueCaptured)
 
     ' ▼ どの編集でもまずログ＆黄色塗り（表シートかどうかは中で判定）
     Call LogEditAndHighlight(Target)
@@ -423,6 +441,104 @@ ErrorHandler:
     Resume CleanExit
 End Sub
 
+Private Sub HandleSplitParcelChange(ByVal Target As Range, ByVal previousValue As Variant, ByVal previousValueCaptured As Boolean)
+    Dim suffixes As Variant
+    Dim i As Long
+    Dim sourceCol As Long
+    Dim historyCol As Long
+    Dim rowSuffix As String
+    Dim oldText As String
+    Dim newText As String
+    Dim branchText As String
+    Dim historyCell As Range
+    Dim existingValue As Variant
+    Dim existingText As String
+
+    If Target.Cells.CountLarge <> 1 Then Exit Sub
+    If Not previousValueCaptured Then Exit Sub
+    If Target.Row < SPLIT_HISTORY_FIRST_DATA_ROW Then Exit Sub
+    If IsError(previousValue) Or IsEmpty(previousValue) Then Exit Sub
+
+    oldText = CStr(previousValue)
+    If Len(oldText) = 0 Then Exit Sub
+    If InStr(1, oldText, "-", vbBinaryCompare) > 0 Then Exit Sub
+
+    If IsError(Target.Value2) Or IsEmpty(Target.Value2) Then Exit Sub
+    newText = CStr(Target.Value2)
+    If Len(newText) <= Len(oldText) + 1 Then Exit Sub
+    If StrComp(Left$(newText, Len(oldText) + 1), oldText & "-", vbBinaryCompare) <> 0 Then Exit Sub
+
+    branchText = Mid$(newText, Len(oldText) + 2)
+    If Not IsPositiveSplitSuffix(branchText) Then Exit Sub
+
+    suffixes = Array("①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩", "⑪", "⑫", "⑬", "⑭", "⑮", "⑯", "⑰", "⑱", "⑲", "⑳")
+    For i = LBound(suffixes) To UBound(suffixes)
+        rowSuffix = CStr(suffixes(i))
+        sourceCol = FindSplitHistoryHeaderColumn("元地番" & rowSuffix)
+        If sourceCol = Target.Column Then
+            historyCol = FindSplitHistoryHeaderColumn("分筆前元地番" & rowSuffix)
+            Exit For
+        End If
+    Next i
+    If sourceCol = 0 Or historyCol = 0 Then Exit Sub
+
+    Set historyCell = Me.Cells(Target.Row, historyCol)
+    If ConfirmSplitHistory("元地番が『" & oldText & "』から『" & newText & "』に変更されました。" & vbCrLf & _
+        "分筆前元地番は『" & oldText & "』でよろしいですか？") <> vbYes Then Exit Sub
+
+    existingValue = historyCell.Value2
+    If IsError(existingValue) Then
+        existingText = CStr(historyCell.Text)
+        If ConfirmSplitHistory("分筆前元地番には既に『" & existingText & "』が登録されています。" & vbCrLf & _
+            "『" & oldText & "』に上書きしますか？") <> vbYes Then Exit Sub
+    ElseIf Not IsEmpty(existingValue) Then
+        existingText = CStr(existingValue)
+        If StrComp(existingText, oldText, vbBinaryCompare) = 0 Then Exit Sub
+        If ConfirmSplitHistory("分筆前元地番には既に『" & existingText & "』が登録されています。" & vbCrLf & _
+            "『" & oldText & "』に上書きしますか？") <> vbYes Then Exit Sub
+    End If
+
+    historyCell.Value2 = previousValue
+End Sub
+
+Private Function IsPositiveSplitSuffix(ByVal text As String) As Boolean
+    Dim i As Long
+    Dim digit As String
+    Dim hasNonZero As Boolean
+
+    If Len(text) = 0 Then Exit Function
+    For i = 1 To Len(text)
+        digit = Mid$(text, i, 1)
+        If digit < "0" Or digit > "9" Then Exit Function
+        If digit <> "0" Then hasNonZero = True
+    Next i
+    If hasNonZero Then IsPositiveSplitSuffix = True
+End Function
+
+Private Function FindSplitHistoryHeaderColumn(ByVal headerName As String) As Long
+    Dim lastCol As Long
+    Dim col As Long
+    Dim headerValue As Variant
+
+    lastCol = Me.Cells(SPLIT_HISTORY_HEADER_ROW, Me.Columns.Count).End(xlToLeft).Column
+    For col = 1 To lastCol
+        headerValue = Me.Cells(SPLIT_HISTORY_HEADER_ROW, col).Value2
+        If Not IsError(headerValue) Then
+            If StrComp(CStr(headerValue), headerName, vbBinaryCompare) = 0 Then
+                If FindSplitHistoryHeaderColumn <> 0 Then
+                    FindSplitHistoryHeaderColumn = 0
+                    Exit Function
+                End If
+                FindSplitHistoryHeaderColumn = col
+            End If
+        End If
+    Next col
+End Function
+
+Private Function ConfirmSplitHistory(ByVal prompt As String) As VbMsgBoxResult
+    ConfirmSplitHistory = MsgBox(prompt, vbQuestion + vbYesNo + vbDefaultButton2, "分筆前元地番の確認")
+End Function
+
 '---------------------------------------------
 ' 金額3（EL列）の金額に応じて、検査員（EP列）を色分け
 ' ※金額3が未入力/数値解釈不可なら EP は一切変更しない
@@ -499,7 +615,16 @@ Private Sub Worksheet_SelectionChange(ByVal Target As Range)
     Dim eventsBefore As Boolean
     
     On Error Resume Next
-    
+    Err.Clear
+    mPreviousSelectionCaptured = False
+    mPreviousSelectionAddress = vbNullString
+    If Target.Cells.CountLarge = 1 And Target.Row >= SPLIT_HISTORY_FIRST_DATA_ROW Then
+        mPreviousSelectionAddress = Target.Address(False, False)
+        mPreviousSelectionValue = Target.Value2
+        mPreviousSelectionCaptured = (Err.Number = 0)
+    End If
+    Err.Clear
+
     ' 見出し行（3行目）の最終列を取得
     lastCol = Me.Cells(3, Me.Columns.Count).End(xlToLeft).Column
     
